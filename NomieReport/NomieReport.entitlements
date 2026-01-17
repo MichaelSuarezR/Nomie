@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSFamilyControlsUsageDescription</key>
-	<string>Nomie uses Screen Time data to help you reduce doomscrolling and track focus.</string>
+	<key>com.apple.developer.family-controls</key>
+	<true/>
 </dict>
 </plist>
