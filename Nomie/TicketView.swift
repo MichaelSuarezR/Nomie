@@ -442,9 +442,9 @@ struct StoryProgressSegment: View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.white.opacity(0.35))
+                    .fill(Color.black.opacity(0.15))
                 Capsule()
-                    .fill(Color.white)
+                    .fill(Color.black.opacity(0.55))
                     .frame(width: proxy.size.width * CGFloat(progress))
             }
         }
@@ -492,13 +492,13 @@ struct StoryBasePage<Content: View>: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Spacer().frame(height: 30)
+            Spacer(minLength: 0)
             Text(title)
                 .font(.custom("AvenirNext-Medium", size: 22))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
             content
-            Spacer()
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
@@ -539,6 +539,7 @@ struct StoryBreakdown: View {
                 BreakdownRow(rank: "4.", minutes: "1h 3min", uses: "8 uses", highlight: false)
                 BreakdownRow(rank: "5.", minutes: "30 min", uses: "12 uses", highlight: false)
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 }
@@ -552,6 +553,7 @@ struct StoryAchievements: View {
                 AchievementRow(title: "GARDENER", subtitle: "spend 1+ hr daily on\nproductivity", color: Color(red: 0.16, green: 0.39, blue: 0.28))
                 AchievementRow(title: "ANTI-SCROLLER", subtitle: "avoid spending over 30\nminutes at a time on\ndrifting", color: Color(red: 0.47, green: 0.23, blue: 0.45))
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 }
