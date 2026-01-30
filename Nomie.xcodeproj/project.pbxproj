@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		30C5984C782E451E9E6C7744 /* NomieReport.appex in CopyFiles */ = {isa = PBXBuildFile; fileRef = 33547793D1C44B5CA38D2D13 /* NomieReport.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C669C3B72F2D5B1800CC1476 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = C669C3B62F2D5B1800CC1476 /* Auth */; };
+		C669C3B92F2D5B1800CC1476 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = C669C3B82F2D5B1800CC1476 /* PostgREST */; };
+		C669C3BB2F2D5B1800CC1476 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = C669C3BA2F2D5B1800CC1476 /* Supabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -112,6 +115,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C669C3B92F2D5B1800CC1476 /* PostgREST in Frameworks */,
+				C669C3B72F2D5B1800CC1476 /* Auth in Frameworks */,
+				C669C3BB2F2D5B1800CC1476 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -198,6 +204,9 @@
 			);
 			name = Nomie;
 			packageProductDependencies = (
+				C669C3B62F2D5B1800CC1476 /* Auth */,
+				C669C3B82F2D5B1800CC1476 /* PostgREST */,
+				C669C3BA2F2D5B1800CC1476 /* Supabase */,
 			);
 			productName = Nomie;
 			productReference = B04FFBED2F1B1C290073190A /* Nomie.app */;
@@ -284,6 +293,9 @@
 			);
 			mainGroup = B04FFBE42F1B1C290073190A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C669C3B52F2D5B1800CC1476 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B04FFBEE2F1B1C290073190A /* Products */;
 			projectDirPath = "";
@@ -384,12 +396,12 @@
 				CODE_SIGN_ENTITLEMENTS = NomieReport/NomieReport.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MFN268BCDH;
+				DEVELOPMENT_TEAM = 88254UH7J8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = NomieReport/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.alikarim.nomie.NomieReport;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alikarim.nomie;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
@@ -403,12 +415,12 @@
 				CODE_SIGN_ENTITLEMENTS = NomieReport/NomieReport.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MFN268BCDH;
+				DEVELOPMENT_TEAM = 88254UH7J8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = NomieReport/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.alikarim.nomie.NomieReport;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alikarim.nomie;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
@@ -424,7 +436,7 @@
 				CODE_SIGN_ENTITLEMENTS = Nomie/Nomie.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MFN268BCDH;
+				DEVELOPMENT_TEAM = 88254UH7J8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Nomie/Info.plist;
@@ -458,7 +470,7 @@
 				CODE_SIGN_ENTITLEMENTS = Nomie/Nomie.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = MFN268BCDH;
+				DEVELOPMENT_TEAM = 88254UH7J8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Nomie/Info.plist;
@@ -738,6 +750,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C669C3B52F2D5B1800CC1476 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift?utm_source=chatgpt.com";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C669C3B62F2D5B1800CC1476 /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C669C3B52F2D5B1800CC1476 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		C669C3B82F2D5B1800CC1476 /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C669C3B52F2D5B1800CC1476 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		C669C3BA2F2D5B1800CC1476 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C669C3B52F2D5B1800CC1476 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B04FFBE52F1B1C290073190A /* Project object */;
 }

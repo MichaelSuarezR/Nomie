@@ -125,7 +125,7 @@ struct ChartHeader: View {
 
     var body: some View {
         Text("Total Usage: " + formatSeconds(totalSeconds))
-            .font(.system(size: 32, weight: .medium, ))
+            .font(.system(size: 32, weight: .medium ))
             .italic()
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 13)
@@ -180,7 +180,7 @@ struct BarChartView: View {
 
 struct GoalsView: View {
     var body: some View {
-        
+        EmptyView()
     }
 }
 
