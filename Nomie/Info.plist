@@ -4,5 +4,9 @@
 <dict>
 	<key>NSFamilyControlsUsageDescription</key>
 	<string>Nomie uses Screen Time data to help you reduce doomscrolling and track focus.</string>
+	<key>SupabaseAnonKey</key>
+	<string>sb_publishable_ChBERvx1OnQbl4FCOgfcPA_nSNOP6h9</string>
+	<key>SupabaseURL</key>
+	<string>https://ufvhchuwzjzpchmnuxwv.supabase.co</string>
 </dict>
 </plist>
