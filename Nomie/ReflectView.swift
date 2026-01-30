@@ -7,6 +7,16 @@ import SwiftUI
 
 struct ReflectView: View {
     @State private var loggedMoods: [ReflectDateKey: ReflectMoodOption] = [:]
+    private let calendar = Calendar.current
+
+    private var todayMood: ReflectMoodOption? {
+        moodForDate(Date())
+    }
+
+    private var yesterdayMood: ReflectMoodOption? {
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) else { return nil }
+        return moodForDate(yesterday)
+    }
 
     var body: some View {
         NavigationStack {
@@ -15,48 +25,85 @@ struct ReflectView: View {
                     ReflectHeader(title: "Reflect")
 
                     ReflectSectionTitle(text: "Daily Mood")
-                    ReflectCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Past 7 days")
-                                .font(.custom("AvenirNext-Medium", size: 14))
-                                .foregroundStyle(Color.black.opacity(0.6))
-                            HStack(spacing: 12) {
-                                ForEach(last7Days()) { day in
-                                    VStack(spacing: 6) {
-                                        if let mood = day.mood {
-                                            MoodAssetImage(assetName: mood.assetName, intensity: 0.7)
-                                                .frame(width: 32, height: 32)
-                                        } else {
-                                            Circle()
-                                                .fill(Color.black.opacity(0.15))
-                                                .frame(width: 32, height: 32)
-                                        }
-                                        Text(day.dayLabel)
-                                            .font(.custom("AvenirNext-Medium", size: 12))
-                                        Text(day.dateLabel)
-                                            .font(.custom("AvenirNext-Regular", size: 11))
-                                            .foregroundStyle(Color.black.opacity(0.6))
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                }
-                            }
-                            NavigationLink {
-                                DailyMoodView(loggedMoods: $loggedMoods)
-                            } label: {
-                                VStack(spacing: 6) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color.black.opacity(0.15))
-                                            .frame(width: 36, height: 36)
-                                        Image(systemName: "plus")
-                                            .foregroundStyle(Color.black.opacity(0.7))
-                                    }
-                                    Text("Log Mood")
+                    HStack(spacing: 16) {
+                        NavigationLink {
+                            DailyMoodView(loggedMoods: $loggedMoods)
+                        } label: {
+                            ReflectSoftCard {
+                                VStack(spacing: 10) {
+                                    Text("Today's mood:")
                                         .font(.custom("AvenirNext-Medium", size: 13))
+                                        .foregroundStyle(Color.black.opacity(0.7))
+
+                                    if let mood = todayMood {
+                                        MoodAssetImage(
+                                            assetName: mood.assetName,
+                                            intensity: 0.75,
+                                            contentMode: .fit
+                                        )
+                                        .frame(width: 84, height: 84)
+                                        .scaleEffect(1.15)
+                                        Text(mood.name)
+                                            .font(.custom("AvenirNext-Medium", size: 13))
+                                            .foregroundStyle(Color.black.opacity(0.8))
+                                    } else {
+                                        Circle()
+                                            .stroke(
+                                                Color.black.opacity(0.7),
+                                                style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])
+                                            )
+                                            .frame(width: 84, height: 84)
+
+                                        VStack(spacing: 6) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(Color.white)
+                                                    .frame(width: 32, height: 32)
+                                                    .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 4)
+                                                Image(systemName: "plus")
+                                                    .foregroundStyle(Color.black.opacity(0.7))
+                                            }
+
+                                            Text("Log Mood")
+                                                .font(.custom("AvenirNext-Medium", size: 12))
+                                                .foregroundStyle(Color.black.opacity(0.7))
+                                        }
+                                        .frame(height: 54)
+                                    }
                                 }
                                 .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.plain)
+                        }
+                        .buttonStyle(.plain)
+
+                        ReflectSoftCard {
+                            VStack(spacing: 10) {
+                                Text("Yesterday's mood:")
+                                    .font(.custom("AvenirNext-Medium", size: 13))
+                                    .foregroundStyle(Color.black.opacity(0.7))
+
+                                if let mood = yesterdayMood {
+                                    MoodAssetImage(
+                                        assetName: mood.assetName,
+                                        intensity: 0.75,
+                                        contentMode: .fit
+                                    )
+                                    .frame(width: 84, height: 84)
+                                    .scaleEffect(1.15)
+                                    Text(mood.name)
+                                        .font(.custom("AvenirNext-Medium", size: 13))
+                                        .foregroundStyle(Color.black.opacity(0.8))
+                                } else {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.12))
+                                        .frame(width: 84, height: 84)
+                                    Text("No entry")
+                                        .font(.custom("AvenirNext-Medium", size: 12))
+                                        .foregroundStyle(Color.black.opacity(0.6))
+                                        .frame(height: 54)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
                         }
                     }
 
@@ -170,6 +217,25 @@ struct ReflectCard<Content: View>: View {
     }
 }
 
+struct ReflectSoftCard<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.black.opacity(0.08))
+                    .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 6)
+            )
+    }
+}
+
 struct ReflectMiniChart: View {
     var body: some View {
         GeometryReader { proxy in
@@ -199,7 +265,7 @@ struct ReflectMiniChart: View {
 
 struct DailyMoodView: View {
     @Binding var loggedMoods: [ReflectDateKey: ReflectMoodOption]
-    @State private var selectedMoodIndex = 1
+    @State private var selectedMoodIndex = 0
     @State private var moodLevels: [MoodLevelState] = [
         .init(label: "stress", value: 0.5),
         .init(label: "fun", value: 0.5),
@@ -216,92 +282,74 @@ struct DailyMoodView: View {
                 Text("Daily Mood")
                     .font(.custom("Georgia", size: 32))
                     .foregroundStyle(Color.black.opacity(0.85))
-                Text("How was your mood today?")
+                Text("How was your overall mood today?")
                     .font(.custom("AvenirNext-Regular", size: 15))
                     .foregroundStyle(Color.black.opacity(0.6))
 
-                VStack(spacing: 8) {
-                    Text("Scroll to choose a mood")
-                        .font(.custom("AvenirNext-Regular", size: 12))
-                        .foregroundStyle(Color.black.opacity(0.5))
-
-                    HStack(spacing: 10) {
-                        Button {
-                            selectedMoodIndex = max(0, selectedMoodIndex - 1)
-                        } label: {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(Color.black.opacity(0.55))
+                MoodOrbitPicker(
+                    selectedMoodIndex: $selectedMoodIndex,
+                    onSelect: { index in
+                        guard ReflectMoodOption.moods.indices.contains(index) else { return }
+                        let mood = ReflectMoodOption.moods[index]
+                        logMood(mood)
+                    }
+                )
+                    .frame(height: 280)
+                    .onAppear {
+                        if let todayMood = moodForDate(Date()),
+                           let index = ReflectMoodOption.moods.firstIndex(of: todayMood) {
+                            selectedMoodIndex = index
                         }
+                    }
 
-                        ScrollViewReader { proxy in
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 18) {
-                                    ForEach(ReflectMoodOption.moods.indices, id: \.self) { idx in
-                                        let mood = ReflectMoodOption.moods[idx]
-                                        Button {
-                                            selectedMoodIndex = idx
-                                        } label: {
-                                            MoodSelectorPreview(
-                                                mood: mood,
-                                                size: idx == selectedMoodIndex ? 86 : 66,
-                                                isSelected: idx == selectedMoodIndex
-                                            )
-                                            .id(idx)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Mood Levels")
+                        .font(.custom("Georgia", size: 22))
+                        .foregroundStyle(Color.black.opacity(0.8))
+                    ReflectCard {
+                        VStack(spacing: 16) {
+                            Text("How much did you experience each of these moods today?")
+                                .font(.custom("AvenirNext-Medium", size: 13))
+                                .foregroundStyle(Color.black.opacity(0.7))
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .multilineTextAlignment(.center)
+                                .padding(.bottom, 6)
+                            ForEach($moodLevels) { $level in
+                                MoodLevelRow(
+                                    level: $level,
+                                    mood: ReflectMoodOption.moods[selectedMoodIndex]
+                                )
                             }
-                            .onChange(of: selectedMoodIndex) { _, newValue in
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    proxy.scrollTo(newValue, anchor: .center)
-                                }
-                            }
-                            .onAppear {
-                                proxy.scrollTo(selectedMoodIndex, anchor: .center)
-                            }
-                        }
-
-                        Button {
-                            selectedMoodIndex = min(ReflectMoodOption.moods.count - 1, selectedMoodIndex + 1)
-                        } label: {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(Color.black.opacity(0.55))
                         }
                     }
                 }
-                .padding(.vertical, 6)
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Mood details")
-                        .font(.custom("Georgia", size: 22))
-                        .foregroundStyle(Color.black.opacity(0.8))
-                    Text("How much did you experience each of these moods today?")
-                        .font(.custom("AvenirNext-Regular", size: 13))
-                        .foregroundStyle(Color.black.opacity(0.55))
-                    ReflectCard {
-                        VStack(spacing: 14) {
-                            ForEach($moodLevels) { $level in
-                                HStack(spacing: 12) {
-                                    MoodAssetImage(
-                                        assetName: ReflectMoodOption.moods[selectedMoodIndex].assetName,
-                                        intensity: level.value
-                                    )
-                                    .frame(width: 32, height: 32)
-                                    Text(level.label)
-                                        .font(.custom("AvenirNext-Regular", size: 14))
-                                        .foregroundStyle(Color.black.opacity(0.8))
-                                        .frame(width: 80, alignment: .leading)
-                                    Slider(value: $level.value, in: 0...1, step: 0.25)
-                                        .accentColor(Color.black.opacity(0.6))
-                                    Text("\(Int(level.value * 100))%")
-                                        .font(.custom("AvenirNext-Medium", size: 12))
+                ReflectCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Past 7 days")
+                            .font(.custom("AvenirNext-Medium", size: 14))
+                            .foregroundStyle(Color.black.opacity(0.7))
+                        HStack(spacing: 10) {
+                            ForEach(last7Days()) { day in
+                                VStack(spacing: 6) {
+                                    if let mood = day.mood {
+                                        MoodAssetImage(assetName: mood.assetName, intensity: 0.7)
+                                            .frame(width: 34, height: 34)
+                                    } else {
+                                        Circle()
+                                            .stroke(
+                                                Color.black.opacity(0.7),
+                                                style: StrokeStyle(lineWidth: 1.2, dash: [3, 3])
+                                            )
+                                            .frame(width: 34, height: 34)
+                                    }
+                                    Text(day.dayLabel)
+                                        .font(.custom("AvenirNext-Medium", size: 11))
+                                    Text(day.dateLabel)
+                                        .font(.custom("AvenirNext-Regular", size: 11))
                                         .foregroundStyle(Color.black.opacity(0.6))
                                 }
+                                .frame(maxWidth: .infinity)
                             }
                         }
                     }
@@ -361,54 +409,80 @@ struct DailyMoodView: View {
                     }
                 }
 
-                Button {
-                    let mood = ReflectMoodOption.moods[selectedMoodIndex]
-                    let key = ReflectDateKey(date: Date(), calendar: calendar)
-                    loggedMoods[key] = mood
-                    dismiss()
-                } label: {
-                    Text("Log mood")
-                        .font(.custom("AvenirNext-Medium", size: 14))
-                        .foregroundStyle(Color.black.opacity(0.8))
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 30)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.black.opacity(0.08),
-                                            Color.black.opacity(0.18)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.white.opacity(0.8), lineWidth: 1)
-                                .blendMode(.softLight)
-                        )
-                        .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 6)
-                        .shadow(color: Color.white.opacity(0.6), radius: 6, x: -2, y: -2)
+                if !mostExperiencedMoods.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Most experienced moods")
+                            .font(.custom("AvenirNext-Medium", size: 14))
+                            .foregroundStyle(Color.black.opacity(0.7))
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 2), spacing: 14) {
+                            ForEach(mostExperiencedMoods) { item in
+                                MostExperiencedMoodCard(item: item)
+                            }
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
         }
         .background(Color(red: 0.97, green: 0.97, blue: 0.97))
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.black.opacity(0.8))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
+    }
+
+    private func logMood(_ mood: ReflectMoodOption) {
+        let key = ReflectDateKey(date: Date(), calendar: calendar)
+        loggedMoods[key] = mood
+    }
+
+    private func last7Days() -> [ReflectMoodDayDisplay] {
+        let today = calendar.startOfDay(for: Date())
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M.d"
+        let weekdayLabels = ["SU", "M", "TU", "W", "TH", "F", "S"]
+
+        return (0..<7).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -6 + offset, to: today) else { return nil }
+            let weekdayIndex = calendar.component(.weekday, from: date) - 1
+            let key = ReflectDateKey(date: date, calendar: calendar)
+            let mood = loggedMoods[key]
+            return ReflectMoodDayDisplay(
+                dayLabel: weekdayLabels[weekdayIndex],
+                dateLabel: formatter.string(from: date),
+                mood: mood
+            )
+        }
     }
 }
 
 struct MoodAssetImage: View {
     let assetName: String
     let intensity: Double
+    let contentMode: ContentMode
+
+    init(assetName: String, intensity: Double, contentMode: ContentMode = .fit) {
+        self.assetName = assetName
+        self.intensity = intensity
+        self.contentMode = contentMode
+    }
 
     var body: some View {
         Image(assetName)
             .resizable()
-            .scaledToFit()
+            .aspectRatio(contentMode: contentMode)
             .saturation(0.6 + (0.4 * intensity))
             .opacity(0.4 + (0.6 * intensity))
             .shadow(color: Color.black.opacity(0.15), radius: 6, x: 0, y: 4)
@@ -419,6 +493,19 @@ struct MoodSelectorPreview: View {
     let mood: ReflectMoodOption
     let size: CGFloat
     let isSelected: Bool
+    let showLabel: Bool
+
+    init(
+        mood: ReflectMoodOption,
+        size: CGFloat,
+        isSelected: Bool,
+        showLabel: Bool = true
+    ) {
+        self.mood = mood
+        self.size = size
+        self.isSelected = isSelected
+        self.showLabel = showLabel
+    }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -428,9 +515,68 @@ struct MoodSelectorPreview: View {
                     Circle()
                         .stroke(isSelected ? Color.black.opacity(0.6) : Color.clear, lineWidth: 1)
                 )
-            Text(mood.name)
-                .font(.custom("AvenirNext-Regular", size: isSelected ? 13 : 11))
-                .foregroundStyle(Color.black.opacity(isSelected ? 0.75 : 0.6))
+            if showLabel {
+                Text(mood.name)
+                    .font(.custom("AvenirNext-Regular", size: isSelected ? 13 : 11))
+                    .foregroundStyle(Color.black.opacity(isSelected ? 0.75 : 0.6))
+            }
+        }
+    }
+}
+
+struct MoodOrbitPicker: View {
+    @Binding var selectedMoodIndex: Int
+    let onSelect: (Int) -> Void
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let positions = moodPositions(in: size, count: ReflectMoodOption.moods.count)
+            let selectedMood = ReflectMoodOption.moods[selectedMoodIndex]
+
+            ZStack {
+                VStack(spacing: 8) {
+                    MoodAssetImage(assetName: selectedMood.assetName, intensity: 0.85)
+                        .frame(width: 130, height: 130)
+                    Text(selectedMood.name)
+                        .font(.custom("AvenirNext-Medium", size: 14))
+                        .foregroundStyle(Color.black.opacity(0.8))
+                }
+                .position(x: center.x, y: center.y)
+
+                ForEach(ReflectMoodOption.moods.indices, id: \.self) { idx in
+                    let mood = ReflectMoodOption.moods[idx]
+                    let offset = positions[idx % positions.count]
+                    Button {
+                        selectedMoodIndex = idx
+                        onSelect(idx)
+                    } label: {
+                        MoodSelectorPreview(
+                            mood: mood,
+                            size: 60,
+                            isSelected: idx == selectedMoodIndex,
+                            showLabel: false
+                        )
+                        .frame(width: 72, height: 72)
+                        .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .position(x: center.x + offset.x, y: center.y + offset.y)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func moodPositions(in size: CGSize, count: Int) -> [CGPoint] {
+        let radius = min(size.width, size.height) * 0.42
+        let step = 2 * Double.pi / Double(max(count, 1))
+        let start = -Double.pi / 2
+        return (0..<count).map { index in
+            let angle = start + (Double(index) * step)
+            return CGPoint(x: CGFloat(cos(angle)) * radius,
+                           y: CGFloat(sin(angle)) * radius)
         }
     }
 }
@@ -921,7 +1067,7 @@ struct ReflectStampPlacement {
     }
 }
 
-struct ReflectMoodOption: Identifiable, Equatable {
+struct ReflectMoodOption: Identifiable, Equatable, Hashable {
     let id = UUID()
     let name: String
     let assetName: String
@@ -943,6 +1089,101 @@ struct MoodLevelState: Identifiable {
     let id = UUID()
     let label: String
     var value: Double
+}
+
+struct MoodLevelRow: View {
+    @Binding var level: MoodLevelState
+    let mood: ReflectMoodOption
+    private let segmentValues: [Double] = [0, 0.25, 0.5, 0.75, 1]
+
+    var body: some View {
+        HStack(spacing: 14) {
+            MoodAssetImage(assetName: mood.assetName, intensity: level.value)
+                .frame(width: 28, height: 28)
+
+            Text(level.label.capitalized)
+                .font(.custom("AvenirNext-Regular", size: 14))
+                .foregroundStyle(Color.black.opacity(0.8))
+                .frame(width: 86, alignment: .leading)
+
+            MoodLevelBar(value: $level.value, segmentValues: segmentValues)
+                .frame(height: 26)
+        }
+    }
+}
+
+struct MoodLevelBar: View {
+    @Binding var value: Double
+    let segmentValues: [Double]
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let fillWidth = width * CGFloat(value)
+            let segmentCount = max(segmentValues.count - 1, 1)
+
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.white)
+                    .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
+
+                Rectangle()
+                    .fill(Color.black.opacity(0.08))
+                    .frame(width: max(0, fillWidth))
+
+                ForEach(1..<segmentCount, id: \.self) { idx in
+                    Rectangle()
+                        .fill(Color.black.opacity(0.08))
+                        .frame(width: 1)
+                        .position(
+                            x: (width * CGFloat(idx)) / CGFloat(segmentCount),
+                            y: proxy.size.height / 2
+                        )
+                }
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let clampedX = min(max(gesture.location.x, 0), width)
+                        let rawValue = Double(clampedX / max(width, 1))
+                        let steps = max(Double(segmentValues.count - 1), 1)
+                        let stepped = (rawValue * steps).rounded() / steps
+                        value = min(max(stepped, 0), 1)
+                    }
+            )
+        }
+    }
+}
+
+struct MostExperiencedMood: Identifiable {
+    let id = UUID()
+    let monthLabel: String
+    let mood: ReflectMoodOption
+}
+
+struct MostExperiencedMoodCard: View {
+    let item: MostExperiencedMood
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text(item.monthLabel)
+                .font(.custom("AvenirNext-Medium", size: 12))
+                .foregroundStyle(Color.black.opacity(0.75))
+            MoodAssetImage(assetName: item.mood.assetName, intensity: 0.75)
+                .frame(width: 64, height: 64)
+            Text(item.mood.name)
+                .font(.custom("AvenirNext-Regular", size: 12))
+                .foregroundStyle(Color.black.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.black.opacity(0.12))
+                .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 4)
+        )
+    }
 }
 
 struct ReflectDateKey: Hashable {
@@ -978,9 +1219,63 @@ extension ReflectView {
             )
         }
     }
+
+    private func moodForDate(_ date: Date) -> ReflectMoodOption? {
+        let key = ReflectDateKey(date: date, calendar: calendar)
+        return loggedMoods[key]
+    }
 }
 
 extension DailyMoodView {
+    private var mostExperiencedMoods: [MostExperiencedMood] {
+        let nowComponents = calendar.dateComponents([.year, .month], from: Date())
+        let currentYear = nowComponents.year ?? 0
+        let currentMonth = nowComponents.month ?? 0
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM yyyy"
+
+        var monthBuckets: [MonthKey: [ReflectMoodOption]] = [:]
+        var monthDaySets: [MonthKey: Set<Int>] = [:]
+
+        for (key, mood) in loggedMoods {
+            let isPastMonth = (key.year < currentYear) || (key.year == currentYear && key.month < currentMonth)
+            guard isPastMonth else { continue }
+            let monthKey = MonthKey(year: key.year, month: key.month)
+            monthBuckets[monthKey, default: []].append(mood)
+            monthDaySets[monthKey, default: []].insert(key.day)
+        }
+
+        let sortedMonths = monthBuckets.keys.sorted {
+            if $0.year != $1.year { return $0.year > $1.year }
+            return $0.month > $1.month
+        }
+
+        let completedMonths = sortedMonths.filter { monthKey in
+            guard let days = monthDaySets[monthKey] else { return false }
+            var components = DateComponents()
+            components.year = monthKey.year
+            components.month = monthKey.month
+            components.day = 1
+            guard let date = calendar.date(from: components),
+                  let range = calendar.range(of: .day, in: .month, for: date)
+            else { return false }
+            return days.count == range.count
+        }
+
+        return completedMonths.prefix(4).compactMap { monthKey in
+            guard let moods = monthBuckets[monthKey], let most = mostFrequentMood(in: moods) else { return nil }
+            var components = DateComponents()
+            components.year = monthKey.year
+            components.month = monthKey.month
+            components.day = 1
+            let date = calendar.date(from: components) ?? Date()
+            return MostExperiencedMood(
+                monthLabel: formatter.string(from: date),
+                mood: most
+            )
+        }
+    }
+
     private func monthTitle(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
@@ -1004,6 +1299,24 @@ extension DailyMoodView {
         let key = ReflectDateKey(date: date, calendar: calendar)
         return loggedMoods[key]
     }
+
+    private func moodForDate(_ date: Date) -> ReflectMoodOption? {
+        let key = ReflectDateKey(date: date, calendar: calendar)
+        return loggedMoods[key]
+    }
+
+    private func mostFrequentMood(in moods: [ReflectMoodOption]) -> ReflectMoodOption? {
+        var counts: [ReflectMoodOption: Int] = [:]
+        for mood in moods {
+            counts[mood, default: 0] += 1
+        }
+        return counts.max { $0.value < $1.value }?.key
+    }
+}
+
+struct MonthKey: Hashable {
+    let year: Int
+    let month: Int
 }
 
 struct ReflectCalendarDay: Identifiable {
