@@ -127,7 +127,7 @@ struct ChartHeader: View {
 
     var body: some View {
         Text("Total Usage: " + formatSeconds(totalSeconds))
-            .font(.system(size: 32, weight: .medium, ))
+            .font(.system(size: 32, weight: .medium ))
             .italic()
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 13)
@@ -321,7 +321,7 @@ struct SetGoalHeader: View {
 }
 struct DailyWeeklyToggle: View {
     var body: some View {
-        
+        EmptyView()
     }
 }
 struct CategoryDropdown: View {
