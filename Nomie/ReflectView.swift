@@ -18,6 +18,10 @@ struct ReflectView: View {
         return moodForDate(yesterday)
     }
 
+    private var journalDateLabel: String {
+        ReflectJournalPrompt.dateLabel(Date())
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -30,80 +34,13 @@ struct ReflectView: View {
                             DailyMoodView(loggedMoods: $loggedMoods)
                         } label: {
                             ReflectSoftCard {
-                                VStack(spacing: 10) {
-                                    Text("Today's mood:")
-                                        .font(.custom("AvenirNext-Medium", size: 13))
-                                        .foregroundStyle(Color.black.opacity(0.7))
-
-                                    if let mood = todayMood {
-                                        MoodAssetImage(
-                                            assetName: mood.assetName,
-                                            intensity: 0.75,
-                                            contentMode: .fit
-                                        )
-                                        .frame(width: 84, height: 84)
-                                        .scaleEffect(1.15)
-                                        Text(mood.name)
-                                            .font(.custom("AvenirNext-Medium", size: 13))
-                                            .foregroundStyle(Color.black.opacity(0.8))
-                                    } else {
-                                        Circle()
-                                            .stroke(
-                                                Color.black.opacity(0.7),
-                                                style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])
-                                            )
-                                            .frame(width: 84, height: 84)
-
-                                        VStack(spacing: 6) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color.white)
-                                                    .frame(width: 32, height: 32)
-                                                    .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 4)
-                                                Image(systemName: "plus")
-                                                    .foregroundStyle(Color.black.opacity(0.7))
-                                            }
-
-                                            Text("Log Mood")
-                                                .font(.custom("AvenirNext-Medium", size: 12))
-                                                .foregroundStyle(Color.black.opacity(0.7))
-                                        }
-                                        .frame(height: 54)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity)
+                                ReflectMoodCard(title: "Today's mood:", mood: todayMood, isActionable: true)
                             }
                         }
                         .buttonStyle(.plain)
 
                         ReflectSoftCard {
-                            VStack(spacing: 10) {
-                                Text("Yesterday's mood:")
-                                    .font(.custom("AvenirNext-Medium", size: 13))
-                                    .foregroundStyle(Color.black.opacity(0.7))
-
-                                if let mood = yesterdayMood {
-                                    MoodAssetImage(
-                                        assetName: mood.assetName,
-                                        intensity: 0.75,
-                                        contentMode: .fit
-                                    )
-                                    .frame(width: 84, height: 84)
-                                    .scaleEffect(1.15)
-                                    Text(mood.name)
-                                        .font(.custom("AvenirNext-Medium", size: 13))
-                                        .foregroundStyle(Color.black.opacity(0.8))
-                                } else {
-                                    Circle()
-                                        .fill(Color.black.opacity(0.12))
-                                        .frame(width: 84, height: 84)
-                                    Text("No entry")
-                                        .font(.custom("AvenirNext-Medium", size: 12))
-                                        .foregroundStyle(Color.black.opacity(0.6))
-                                        .frame(height: 54)
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
+                            ReflectMoodCard(title: "Yesterday's mood:", mood: yesterdayMood, isActionable: false)
                         }
                     }
 
@@ -113,21 +50,50 @@ struct ReflectView: View {
                     } label: {
                         ReflectCard {
                             VStack(alignment: .leading, spacing: 14) {
-                                Text("Today's prompt:")
-                                    .font(.custom("AvenirNext-Medium", size: 13))
-                                    .foregroundStyle(Color.black.opacity(0.6))
+                                HStack {
+                                    Text("Today's prompt")
+                                        .font(.custom("AvenirNext-Medium", size: 13))
+                                        .foregroundStyle(Color.black.opacity(0.6))
+                                    Spacer()
+                                    Text(journalDateLabel)
+                                        .font(.custom("AvenirNext-Medium", size: 12))
+                                        .foregroundStyle(Color.black.opacity(0.45))
+                                }
+
                                 Text("I enjoyed _____.")
                                     .font(.custom("Georgia", size: 22))
+                                    .foregroundStyle(Color.black.opacity(0.88))
                                     .frame(maxWidth: .infinity, alignment: .center)
-                                Text("Log journal")
-                                    .font(.custom("AvenirNext-Medium", size: 13))
                                     .padding(.vertical, 6)
-                                    .padding(.horizontal, 24)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.black.opacity(0.15))
-                                    )
-                                    .frame(maxWidth: .infinity, alignment: .center)
+
+                                HStack(spacing: 8) {
+                                    Image(systemName: "pencil.and.outline")
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text("Log journal")
+                                        .font(.custom("AvenirNext-Medium", size: 13))
+                                }
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 16)
+                                .background(
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.black.opacity(0.1),
+                                                    Color.black.opacity(0.18)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.85), lineWidth: 1)
+                                        .blendMode(.softLight)
+                                )
+                                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 5)
+                                .frame(maxWidth: .infinity, alignment: .center)
                             }
                         }
                     }
@@ -208,11 +174,12 @@ struct ReflectCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.black.opacity(0.6), lineWidth: 1)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.white)
-                    )
+                    .fill(Color.white)
+                    .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 6)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.black.opacity(0.18), lineWidth: 1)
             )
     }
 }
@@ -231,8 +198,72 @@ struct ReflectSoftCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.black.opacity(0.08))
-                    .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 6)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                            .blendMode(.softLight)
+                    )
+                    .shadow(color: Color.black.opacity(0.16), radius: 8, x: 0, y: 6)
             )
+    }
+}
+
+struct ReflectMoodCard: View {
+    let title: String
+    let mood: ReflectMoodOption?
+    let isActionable: Bool
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(title)
+                .font(.custom("AvenirNext-Medium", size: 13))
+                .foregroundStyle(Color.black.opacity(0.7))
+
+            if let mood {
+                MoodAssetImage(
+                    assetName: mood.assetName,
+                    intensity: 0.75,
+                    contentMode: .fit
+                )
+                .frame(width: 84, height: 84)
+                .scaleEffect(1.15)
+                Text(mood.name)
+                    .font(.custom("AvenirNext-Medium", size: 13))
+                    .foregroundStyle(Color.black.opacity(0.8))
+            } else if isActionable {
+                Circle()
+                    .stroke(
+                        Color.black.opacity(0.7),
+                        style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])
+                    )
+                    .frame(width: 84, height: 84)
+
+                VStack(spacing: 6) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 32, height: 32)
+                            .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 4)
+                        Image(systemName: "plus")
+                            .foregroundStyle(Color.black.opacity(0.7))
+                    }
+
+                    Text("Log Mood")
+                        .font(.custom("AvenirNext-Medium", size: 12))
+                        .foregroundStyle(Color.black.opacity(0.7))
+                }
+                .frame(height: 54)
+            } else {
+                Circle()
+                    .fill(Color.black.opacity(0.12))
+                    .frame(width: 84, height: 84)
+                Text("No entry")
+                    .font(.custom("AvenirNext-Medium", size: 12))
+                    .foregroundStyle(Color.black.opacity(0.6))
+                    .frame(height: 54)
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -726,53 +757,140 @@ struct SelfJournalView: View {
     @State private var prompt = ReflectJournalPrompt.randomPrompt()
     @State private var journalEntries: [ReflectJournalEntry] = []
     @State private var placedStamps: [ReflectPlacedStamp] = []
+    @State private var earnedStamps: [ReflectStampDefinition] = []
+    @FocusState private var isEntryFocused: Bool
     private let today = Date()
+    private let entryHint = "Keep it short — one to three sentences."
+
+    private var wordCount: Int {
+        entry.split { $0 == " " || $0 == "\n" || $0 == "\t" }.count
+    }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 20) {
                 Text("Self-Journal")
                     .font(.custom("Georgia", size: 32))
                     .foregroundStyle(Color.black.opacity(0.85))
 
                 ReflectCard {
                     VStack(spacing: 12) {
-                        Text("Today (\(ReflectJournalPrompt.dateLabel(today)))'s prompt:")
-                            .font(.custom("AvenirNext-Medium", size: 14))
-                            .foregroundStyle(Color.black.opacity(0.65))
+                        HStack {
+                            Text("Today • \(ReflectJournalPrompt.dateLabel(today))")
+                                .font(.custom("AvenirNext-Medium", size: 12))
+                                .foregroundStyle(Color.black.opacity(0.55))
+                            Spacer()
+                            Button {
+                                prompt = ReflectJournalPrompt.randomPrompt()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text("New prompt")
+                                        .font(.custom("AvenirNext-Medium", size: 11))
+                                }
+                                .foregroundStyle(Color.black.opacity(0.7))
+                            }
+                            .buttonStyle(.plain)
+                        }
+
                         Text("\"\(prompt)\"")
                             .font(.custom("Georgia", size: 22))
                             .foregroundStyle(Color.black.opacity(0.85))
-                        TextField("type here", text: $entry, axis: .vertical)
-                            .font(.custom("AvenirNext-Regular", size: 14))
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
-                            .background(
-                                Capsule()
-                                    .fill(Color.black.opacity(0.12))
-                            )
-                        Button {
-                            let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !trimmed.isEmpty else { return }
-                            journalEntries.insert(
-                                ReflectJournalEntry(date: Date(), prompt: prompt, text: trimmed),
-                                at: 0
-                            )
-                            entry = ""
-                            prompt = ReflectJournalPrompt.randomPrompt()
-                        } label: {
-                            Text("Log journal")
-                                .font(.custom("AvenirNext-Medium", size: 13))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            ZStack(alignment: .topLeading) {
+                                TextEditor(text: $entry)
+                                    .font(.custom("AvenirNext-Regular", size: 14))
+                                    .foregroundStyle(Color.black.opacity(0.82))
+                                    .padding(.horizontal, 6)
+                                    .padding(.top, 8)
+                                    .frame(minHeight: 120, maxHeight: 160)
+                                    .scrollContentBackground(.hidden)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                            .fill(Color.white)
+                                            .overlay(
+                                                ReflectLinedPaper()
+                                                    .padding(.horizontal, 12)
+                                                    .padding(.top, 10)
+                                                    .opacity(0.55)
+                                            )
+                                            .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 4)
+                                    )
+                                    .focused($isEntryFocused)
+
+                                if entry.isEmpty {
+                                    Text("Start writing...")
+                                        .font(.custom("AvenirNext-Regular", size: 14))
+                                        .foregroundStyle(Color.black.opacity(0.35))
+                                        .padding(.horizontal, 14)
+                                        .padding(.top, 16)
+                                }
+                            }
+
+                            HStack {
+                                Text(entryHint)
+                                    .font(.custom("AvenirNext-Regular", size: 12))
+                                    .foregroundStyle(Color.black.opacity(0.5))
+                                Spacer()
+                                Text("\(wordCount) words")
+                                    .font(.custom("AvenirNext-Medium", size: 11))
+                                    .foregroundStyle(Color.black.opacity(0.5))
+                            }
+                        }
+
+                        HStack(spacing: 12) {
+                            Button {
+                                entry = ""
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text("Clear")
+                                        .font(.custom("AvenirNext-Medium", size: 12))
+                                }
+                                .foregroundStyle(Color.black.opacity(0.6))
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 18)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.08))
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            Spacer()
+
+                            Button {
+                                let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !trimmed.isEmpty else { return }
+                                journalEntries.insert(
+                                    ReflectJournalEntry(date: Date(), prompt: prompt, text: trimmed),
+                                    at: 0
+                                )
+                                entry = ""
+                                prompt = ReflectJournalPrompt.randomPrompt()
+                                isEntryFocused = false
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text("Save entry")
+                                        .font(.custom("AvenirNext-Medium", size: 13))
+                                }
                                 .foregroundStyle(Color.black.opacity(0.8))
                                 .padding(.vertical, 10)
-                                .padding(.horizontal, 26)
+                                .padding(.horizontal, 22)
                                 .background(
                                     Capsule()
                                         .fill(
                                             LinearGradient(
                                                 colors: [
                                                     Color.black.opacity(0.08),
-                                                    Color.black.opacity(0.18)
+                                                    Color.black.opacity(0.2)
                                                 ],
                                                 startPoint: .topLeading,
                                                 endPoint: .bottomTrailing
@@ -784,8 +902,10 @@ struct SelfJournalView: View {
                                         .stroke(Color.white.opacity(0.8), lineWidth: 1)
                                         .blendMode(.softLight)
                                 )
-                                .shadow(color: Color.black.opacity(0.18), radius: 10, x: 0, y: 6)
+                                .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 6)
                                 .shadow(color: Color.white.opacity(0.6), radius: 6, x: -2, y: -2)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -795,17 +915,25 @@ struct SelfJournalView: View {
                         .font(.custom("Georgia", size: 22))
                         .foregroundStyle(Color.black.opacity(0.85))
                     ReflectCard {
-                        VStack(alignment: .leading, spacing: 14) {
-                            ForEach(ReflectStampDefinition.samples) { stamp in
-                                HStack(spacing: 12) {
-                                    ReflectStampBadge(stamp: stamp)
-                                        .frame(width: 52, height: 52)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(stamp.title.uppercased())
-                                            .font(.custom("AvenirNext-DemiBold", size: 12))
-                                        Text(stamp.subtitle)
-                                            .font(.custom("AvenirNext-Regular", size: 11))
-                                            .foregroundStyle(Color.black.opacity(0.6))
+                        if earnedStamps.isEmpty {
+                            Text("Unlock achievements and stamps to put on your journal.")
+                                .font(.custom("AvenirNext-Regular", size: 13))
+                                .foregroundStyle(Color.black.opacity(0.6))
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 10)
+                        } else {
+                            VStack(alignment: .leading, spacing: 14) {
+                                ForEach(earnedStamps) { stamp in
+                                    HStack(spacing: 12) {
+                                        ReflectStampBadge(stamp: stamp)
+                                            .frame(width: 52, height: 52)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(stamp.title.uppercased())
+                                                .font(.custom("AvenirNext-DemiBold", size: 12))
+                                            Text(stamp.subtitle)
+                                                .font(.custom("AvenirNext-Regular", size: 11))
+                                                .foregroundStyle(Color.black.opacity(0.6))
+                                        }
                                     }
                                 }
                             }
@@ -817,28 +945,36 @@ struct SelfJournalView: View {
                     Text("Decorate your journal")
                         .font(.custom("AvenirNext-Medium", size: 13))
                         .foregroundStyle(Color.black.opacity(0.6))
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(ReflectStampDefinition.samples) { stamp in
-                                let isUsed = placedStamps.contains(where: { $0.stamp.id == stamp.id })
-                                Button {
-                                    guard !isUsed else { return }
-                                    placedStamps.append(
-                                        ReflectPlacedStamp(
-                                            stamp: stamp,
-                                            position: CGPoint(x: 160, y: 24)
+                    if earnedStamps.isEmpty {
+                        Text("Unlock achievements and stamps to put on your journal.")
+                            .font(.custom("AvenirNext-Regular", size: 12))
+                            .foregroundStyle(Color.black.opacity(0.5))
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 6)
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(earnedStamps) { stamp in
+                                    let isUsed = placedStamps.contains(where: { $0.stamp.id == stamp.id })
+                                    Button {
+                                        guard !isUsed else { return }
+                                        placedStamps.append(
+                                            ReflectPlacedStamp(
+                                                stamp: stamp,
+                                                position: CGPoint(x: 180, y: 36)
+                                            )
                                         )
-                                    )
-                                } label: {
-                                    ReflectStampBadge(stamp: stamp)
-                                        .frame(width: 56, height: 56)
-                                        .opacity(isUsed ? 0.35 : 1)
+                                    } label: {
+                                        ReflectStampBadge(stamp: stamp)
+                                            .frame(width: 56, height: 56)
+                                            .opacity(isUsed ? 0.35 : 1)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(isUsed)
                                 }
-                                .buttonStyle(.plain)
-                                .disabled(isUsed)
                             }
+                            .padding(.horizontal, 4)
                         }
-                        .padding(.horizontal, 4)
                     }
                 }
 
@@ -851,6 +987,35 @@ struct SelfJournalView: View {
             .padding(.vertical, 20)
         }
         .background(Color(red: 0.97, green: 0.97, blue: 0.97))
+        .onAppear {
+            if journalEntries.isEmpty {
+                journalEntries = ReflectJournalStore.loadEntries()
+            }
+        }
+        .onChange(of: journalEntries) { _ in
+            ReflectJournalStore.saveEntries(journalEntries)
+        }
+    }
+}
+
+struct ReflectLinedPaper: View {
+    private let lineSpacing: CGFloat = 22
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            Path { path in
+                var y: CGFloat = 0
+                while y < height {
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: width, y: y))
+                    y += lineSpacing
+                }
+            }
+            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        }
+        .allowsHitTesting(false)
     }
 }
 
@@ -873,24 +1038,45 @@ struct ReflectSegment: View {
 struct ReflectNotebookView: View {
     let entries: [ReflectJournalEntry]
     @Binding var placedStamps: [ReflectPlacedStamp]
+    private let headerHeight: CGFloat = 44
 
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.black.opacity(0.6), lineWidth: 1)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.white)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white,
+                                Color(red: 0.98, green: 0.97, blue: 0.95)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(Color.black.opacity(0.5), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.18), radius: 14, x: 0, y: 8)
+
+                ReflectLinedPaper()
+                    .padding(.leading, 28)
+                    .padding(.trailing, 24)
+                    .padding(.top, headerHeight + 20)
+                    .opacity(entries.isEmpty ? 0.16 : 0.3)
 
                 HStack(spacing: 12) {
                     VStack(spacing: 8) {
                         ForEach(0..<12, id: \.self) { _ in
-                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                            Capsule()
                                 .fill(Color.black.opacity(0.25))
-                                .frame(width: 26, height: 6)
+                                .frame(width: 28, height: 5)
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.white.opacity(0.7), lineWidth: 1)
+                                )
                         }
                     }
                     .padding(.leading, 12)
@@ -898,28 +1084,38 @@ struct ReflectNotebookView: View {
                     Spacer()
                 }
 
-                ForEach($placedStamps) { $stamp in
-                    ReflectStampBadge(stamp: stamp.stamp)
-                        .frame(width: 54, height: 54)
-                        .position(stamp.position)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    stamp.position = ReflectStampPlacement.clampedPosition(
-                                        proposed: value.location,
-                                        in: size,
-                                        stampSize: CGSize(width: 54, height: 54)
-                                    )
-                                }
-                        )
-                }
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        Text("My Journal")
+                            .font(.custom("Georgia", size: 20))
+                            .foregroundStyle(Color.black.opacity(0.8))
+                        Spacer()
+                        Text("\(entries.count) entries")
+                            .font(.custom("AvenirNext-Medium", size: 11))
+                            .foregroundStyle(Color.black.opacity(0.45))
+                    }
+                    .padding(.top, 18)
+                    .padding(.horizontal, 28)
 
-                VStack {
+                    Rectangle()
+                        .fill(Color.black.opacity(0.08))
+                        .frame(height: 1)
+                        .padding(.horizontal, 28)
+
                     if entries.isEmpty {
-                        Text("No entries yet")
-                            .font(.custom("AvenirNext-Regular", size: 13))
-                            .foregroundStyle(Color.black.opacity(0.6))
-                            .padding(.top, 24)
+                        VStack(spacing: 8) {
+                            Image(systemName: "book.closed")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(Color.black.opacity(0.35))
+                            Text("No entries yet")
+                                .font(.custom("AvenirNext-Regular", size: 13))
+                                .foregroundStyle(Color.black.opacity(0.55))
+                            Text("Start with today's prompt to fill your journal.")
+                                .font(.custom("AvenirNext-Regular", size: 11))
+                                .foregroundStyle(Color.black.opacity(0.4))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 34)
                     } else {
                         TabView {
                             ForEach(entries) { entry in
@@ -942,9 +1138,26 @@ struct ReflectNotebookView: View {
                         .tabViewStyle(.page(indexDisplayMode: .always))
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                ForEach($placedStamps) { $stamp in
+                    ReflectStampBadge(stamp: stamp.stamp)
+                        .frame(width: 54, height: 54)
+                        .position(stamp.position)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    stamp.position = ReflectStampPlacement.clampedPosition(
+                                        proposed: value.location,
+                                        in: size,
+                                        stampSize: CGSize(width: 54, height: 54)
+                                    )
+                                }
+                        )
+                }
             }
         }
-        .frame(height: 360)
+        .frame(height: 380)
     }
 }
 
@@ -955,7 +1168,7 @@ struct ReflectMoodDayDisplay: Identifiable {
     let mood: ReflectMoodOption?
 }
 
-struct ReflectJournalEntry: Identifiable {
+struct ReflectJournalEntry: Identifiable, Codable, Equatable {
     let id = UUID()
     let date: Date
     let prompt: String
@@ -980,6 +1193,24 @@ struct ReflectJournalPrompt {
         let formatter = DateFormatter()
         formatter.dateFormat = "M/d"
         return formatter.string(from: date)
+    }
+}
+
+struct ReflectJournalStore {
+    private static let entriesKey = "reflect.journal.entries"
+
+    static func loadEntries() -> [ReflectJournalEntry] {
+        guard let data = UserDefaults.standard.data(forKey: entriesKey) else { return [] }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return (try? decoder.decode([ReflectJournalEntry].self, from: data)) ?? []
+    }
+
+    static func saveEntries(_ entries: [ReflectJournalEntry]) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(entries) else { return }
+        UserDefaults.standard.set(data, forKey: entriesKey)
     }
 }
 
