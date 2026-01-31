@@ -47,7 +47,7 @@ struct FocusHeader : View {
                         .font(.system(size:20, weight: .medium))
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Text("\(streakDays)")
+                        Text("\(streakDays) days")
                             .font(.system(size:20, weight: .medium))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.leading, 55)
