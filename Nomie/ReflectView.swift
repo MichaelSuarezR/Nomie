@@ -386,6 +386,9 @@ struct DailyMoodView: View {
     @State private var currentMonth = Date()
     private let calendar = Calendar.current
     @Environment(\.dismiss) private var dismiss
+    private var todayKey: ReflectDateKey {
+        ReflectDateKey(date: Date(), calendar: calendar)
+    }
 
     var body: some View {
         ScrollView {
@@ -500,12 +503,15 @@ struct DailyMoodView: View {
                         .foregroundStyle(Color.black.opacity(0.75))
 
                         HStack {
-                            ForEach(["SU", "M", "TU", "W", "TH", "F", "S"], id: \.self) { day in
+                            ForEach(["Su", "M", "Tu", "W", "Th", "F", "S"], id: \.self) { day in
                                 Text(day)
-                                    .font(.custom("AvenirNext-DemiBold", size: 12))
+                                    .font(.custom("AvenirNext-Bold", size: 11))
+                                    .foregroundStyle(Color.black.opacity(0.85))
+                                    .tracking(0.6)
                                     .frame(maxWidth: .infinity)
                             }
                         }
+                        .padding(.bottom, 2)
 
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
                             ForEach(monthGridDays(for: currentMonth), id: \.self) { day in
@@ -564,6 +570,12 @@ struct DailyMoodView: View {
         }
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
+        .onAppear {
+            moodLevels = ReflectMoodLevelStore.loadLevels(for: todayKey, defaults: moodLevels)
+        }
+        .onChange(of: moodLevels) { _ in
+            ReflectMoodLevelStore.saveLevels(moodLevels, for: todayKey)
+        }
     }
 
     private func logMood(_ mood: ReflectMoodOption) {
@@ -2089,6 +2101,26 @@ struct ReflectMoodStore {
     }
 }
 
+struct ReflectMoodLevelStore {
+    private static func levelsKey(for dateKey: ReflectDateKey) -> String {
+        "reflect.mood.levels.\(dateKey.year)-\(dateKey.month)-\(dateKey.day)"
+    }
+
+    static func loadLevels(for dateKey: ReflectDateKey, defaults: [MoodLevelState]) -> [MoodLevelState] {
+        let key = levelsKey(for: dateKey)
+        guard let data = UserDefaults.standard.data(forKey: key) else { return defaults }
+        let decoder = JSONDecoder()
+        return (try? decoder.decode([MoodLevelState].self, from: data)) ?? defaults
+    }
+
+    static func saveLevels(_ levels: [MoodLevelState], for dateKey: ReflectDateKey) {
+        let key = levelsKey(for: dateKey)
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(levels) else { return }
+        UserDefaults.standard.set(data, forKey: key)
+    }
+}
+
 struct ReflectStampDefinition: Identifiable, Hashable {
     let id = UUID()
     let title: String
@@ -2195,7 +2227,7 @@ struct ReflectMoodOption: Identifiable, Equatable, Hashable {
     }
 }
 
-struct MoodLevelState: Identifiable {
+struct MoodLevelState: Identifiable, Codable, Equatable {
     let id = UUID()
     let label: String
     var value: Double
