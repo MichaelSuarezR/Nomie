@@ -7,12 +7,12 @@ import SwiftUI
 
 struct FocusView: View {
     @State private var usage: [CategoryUsage] = [
-        .init(id: .connection, usage: 4 * 3600 + 32 * 60, maxUsage: 5 * 3600, type: "Prioritize"),
-        .init(id: .creativity, usage: 3 * 3600 + 45 * 60, maxUsage: 5 * 3600, type: "Prioritize"),
-        .init(id: .drifting, usage: 2 * 3600 + 58 * 60, maxUsage: 5 * 3600, type: "Limit"),
-        .init(id: .entertainment, usage: 1 * 3600 + 40 * 60, maxUsage: 5 * 3600, type: "Limit"),
-        .init(id: .learning, usage: 52 * 60, maxUsage: 5 * 3600, type: "Prioritize"),
-        .init(id: .productivity, usage: 46 * 60, maxUsage: 5 * 3600, type: "Prioritize")
+        .init(id: .connection, usage: 4 * 3600 + 32 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
+        .init(id: .creativity, usage: 3 * 3600 + 45 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
+        .init(id: .drifting, usage: 2 * 3600 + 58 * 60, maxUsage: 5 * 3600, type: GoalType.Limit),
+        .init(id: .entertainment, usage: 1 * 3600 + 40 * 60, maxUsage: 5 * 3600, type: GoalType.Limit),
+        .init(id: .learning, usage: 52 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
+        .init(id: .productivity, usage: 46 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize)
     ]
     var body: some View {
         NavigationStack {
@@ -21,7 +21,7 @@ struct FocusView: View {
                     FocusHeader(name: "Name", streakDays: 8)
                     DailyInsights(category: "Creativity", timeOfDay: "Morning")
                     Charts(usage: usage)
-                    GoalsView(usage: usage)
+                    GoalsView(usage: $usage)
                 }
             }
             .ignoresSafeArea(edges: .top)
@@ -154,7 +154,7 @@ struct BarChart: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.black.opacity(0.2))
                 Capsule().fill(Color.black.opacity(0.5))
-                    .frame(width:usageWidth)
+                    .frame(width:((usage > maxUsage) ? width : usageWidth))
             }
         }.frame(height: height)
     }
@@ -182,22 +182,22 @@ struct BarChartView: View {
 }
 
 struct GoalsView: View {
-    let usage: [CategoryUsage]
+    @Binding var usage: [CategoryUsage]
     var body: some View {
         VStack {
             Text("Goals").font(.system(size:32, weight:.medium)).frame(maxWidth: .infinity, alignment: .leading)
-            GoalsPill(usage:usage).background(FocusColors.background).cornerRadius(30)
+            GoalsPill(usage: $usage).background(FocusColors.background).cornerRadius(30)
         }.padding(13)
     }
 }
 
 struct GoalsPill: View {
-    let usage: [CategoryUsage]
+    @Binding var usage: [CategoryUsage]
     var body: some View {
         VStack {
             Text("You are \(usage.reduce(0) {$0 + $1.usage} <= usage.reduce(0) {$0 + $1.maxUsage} ? "" : "not")on track to meet today's goals!").font(.system(size:20, weight:.regular)).multilineTextAlignment(.leading).padding(16).frame(maxWidth: .infinity, alignment: .leading)
             NavigationLink {
-                MyGoalsView(usage: usage)
+                MyGoalsView(usage: $usage)
             } label: {
                 Text("View & Set Goals").font(.system(size: 20, weight:.medium)).frame(maxWidth: .infinity, alignment:.leading).padding(16).foregroundColor(.black)
             }
@@ -216,15 +216,15 @@ struct BackButton: View {
     }
 }
 struct MyGoalsView: View {
-    let usage: [CategoryUsage]
+    @Binding var usage: [CategoryUsage]
     
     var body: some View {
         ScrollView {
             ZStack {
                 VStack {
                     VStack{
-                        LimitGoals(usage: usage)
-                        PrioritizeGoals(usage: usage)
+                        LimitGoals(usage: $usage)
+                        PrioritizeGoals(usage: $usage)
                     }
                 }
                 .safeAreaInset(edge: .top) {
@@ -233,7 +233,7 @@ struct MyGoalsView: View {
                     .navigationBarBackButtonHidden(true)
             }
         }.overlay(alignment: .bottomTrailing) {
-            AddGoalButton()
+            AddGoalButton(usage: $usage)
         }
     }
 }
@@ -250,19 +250,19 @@ struct MyGoalsHeader: View {
     }
 }
 struct LimitGoals: View {
-    let usage: [CategoryUsage]
+    @Binding var usage: [CategoryUsage]
     var body: some View {
         Text("Limit").font(.system(size:32, weight:.medium)).frame(maxWidth: .infinity, alignment:.leading).padding(.leading, 13)
-        ForEach(usage.filter {$0.type == "Limit"}) {item in
+        ForEach(usage.filter {$0.type == .Limit}) {item in
             ProgressComponent(categoryUsage: item).padding(.horizontal, 30).padding(.vertical, 8)
         }
     }
 }
 struct PrioritizeGoals: View {
-    let usage: [CategoryUsage]
+    @Binding var usage: [CategoryUsage]
     var body: some View {
         Text("Prioritize").font(.system(size:32, weight:.medium)).frame(maxWidth: .infinity, alignment:.leading).padding(.leading, 13)
-        ForEach(usage.filter {$0.type == "Prioritize"}) {item in
+        ForEach(usage.filter {$0.type == .Prioritize}) {item in
             ProgressComponent(categoryUsage: item).padding(.horizontal, 30).padding(.vertical, 8)
         }
     }
@@ -284,9 +284,10 @@ struct ProgressComponent: View {
 }
 
 struct AddGoalButton: View {
+    @Binding var usage: [CategoryUsage]
     var body: some View {
         NavigationLink {
-            SetGoalView()
+            SetGoalView(usage: $usage)
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 20, style: .continuous).fill(
@@ -298,14 +299,33 @@ struct AddGoalButton: View {
     }
 }
 struct SetGoalView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var usage: [CategoryUsage]
+    @State private var categorySelection: CategoryID = .drifting
+    @State private var goalSelection: GoalType = .Limit
+    @State private var selectedTime: Int = 60
     var body: some View {
         ScrollView {
             VStack {
-                CategoryDropdown().padding(.top, 20)
+                CategoryDropdown(categorySelection: $categorySelection).padding(.top, 13).padding(.horizontal,13)
+                GoalDropdown(goalSelection: $goalSelection).padding(.top, 13).padding(.horizontal,13)
+                SetGoalTime(selectedTime: $selectedTime, goalSelection: goalSelection ).padding(.top, 13).padding(.horizontal,13)
+                Button {
+                    updateCategory()
+                } label: {
+                    SaveButton().padding(.top, 13).padding(.horizontal, 13)
+                }
             }.safeAreaInset(edge: .top) {
                 SetGoalHeader()
             }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).toolbar(.hidden, for:.navigationBar)
         }
+    }
+    func updateCategory () {
+        let newMaxUsage = selectedTime * 60
+        guard let index = usage.firstIndex(where: {$0.id == categorySelection }) else { return }
+        usage[index].maxUsage = newMaxUsage
+        usage[index].type = goalSelection
+        dismiss()
     }
 }
 struct SetGoalHeader: View {
@@ -325,33 +345,182 @@ struct DailyWeeklyToggle: View {
     }
 }
 struct CategoryDropdown: View {
-    @State private var selected: CategoryID = .drifting
+    @Binding var categorySelection: CategoryID
     var body: some View {
         VStack {
             Text("Select a Category").font(.system(size: 24, weight: .regular)).frame(maxWidth:.infinity, alignment:.leading).padding(.leading, 10)
             Menu {
                 ForEach(CategoryID.allCases) {category in
                     Button(category.rawValue) {
-                        selected = category
+                        categorySelection = category
                     }
                 }
             } label: {
                 HStack {
-                    Text(selected.rawValue).font(.system(size:20, weight:.regular)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading,10)
+                    Text(categorySelection.rawValue).font(.system(size:20, weight:.regular)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading,10)
                     Image(systemName: "chevron.down").font(.system(size:18)).frame(maxWidth:.infinity, alignment:.trailing).padding(.trailing, 10)
                 }.padding(.leading, 13).frame(height:47).background(Color.white).cornerRadius(15)
             }.buttonStyle(.plain)
-        }.padding(.horizontal, 13).background(
-            RoundedRectangle(cornerRadius:20, style: .continuous).fill(FocusColors.background).frame(height:118)
+        }.padding(.horizontal, 13).frame(height:118).background(
+            RoundedRectangle(cornerRadius:20, style: .continuous).fill(FocusColors.background)
         )
     }
 }
 
+struct GoalDropdown: View {
+    @Binding var goalSelection: GoalType
+    var body: some View {
+        VStack {
+            Text("Goal Type").font(.system(size: 24, weight: .regular)).frame(maxWidth:.infinity, alignment:.leading).padding(.leading, 10)
+            Menu {
+                ForEach(GoalType.allCases) {goal in
+                    Button(goal.rawValue) {
+                        goalSelection = goal
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(goalSelection.rawValue).font(.system(size:20, weight:.regular)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading,10)
+                    Image(systemName: "chevron.down").font(.system(size:18)).frame(maxWidth:.infinity, alignment:.trailing).padding(.trailing, 10)
+                }.padding(.leading, 13).frame(height:47).background(Color.white).cornerRadius(15)
+            }.buttonStyle(.plain)
+        }.padding(.horizontal, 13).frame(height:118).background(
+            RoundedRectangle(cornerRadius:20, style: .continuous).fill(FocusColors.background)
+        )
+    }
+}
+struct SetGoalTime: View {
+    @Binding var selectedTime: Int
+    let goalSelection: GoalType
+    var body: some View {
+        VStack {
+            Text("Set \(goalSelection == .Limit ? "Limit" : "Target")").font(.system(size: 24, weight: .regular)).frame(maxWidth:.infinity, alignment:.leading).padding(.leading, 10)
+            TimeSelectionBar(selectedTime: $selectedTime).padding(.top, 13)
+        }.frame(maxWidth:.infinity, alignment: .topLeading).frame(height:164, alignment: .topLeading).padding(.horizontal, 13).padding(.top, 13).background(
+            RoundedRectangle(cornerRadius:20, style: .continuous).fill(FocusColors.background)
+        )
+    }
+}
+struct TimeSelectionBar: View {
+    @Binding var selectedTime: Int
+    var minMinutes: Int = 0
+    var maxMinutes: Int = 1440
+    var step: Int = 1
+    
+    var delay : Double = 0.35
+    var repeatInterval: Double = 0.08
+    
+    @State private var repeatTimer: Timer?
+    
+    var body: some View {
+        HStack {
+            RepeatButton(symbol: "-", onTap: {onTap(delta: -step)}, onStartRepeat: {startRepeating(delta: -step)}, onStopRepeat: {stopRepeating()}, size: 60).frame(maxWidth:.infinity, alignment:.leading).padding(.leading, 13)
+            Text("\(selectedTime) min").font(.system(size: 32, weight: .medium)).monospacedDigit().frame(width: 120, alignment: .center)
+            RepeatButton(symbol: "+", onTap: {onTap(delta: step)}, onStartRepeat: {startRepeating(delta: step)}, onStopRepeat: {stopRepeating()}, size: 60).frame(maxWidth: .infinity, alignment:.trailing).padding(.trailing, 13)
+        }.frame(maxWidth:.infinity)
+    }
+    private func change(_ delta: Int) {
+        let newMinutes = selectedTime + delta
+        selectedTime = min(max(newMinutes, minMinutes), maxMinutes)
+    }
+    
+    private func onTap(delta: Int) {
+        change(delta)
+    }
+    private func startRepeating(delta: Int) {
+        stopRepeating()
+        change(delta)
+        
+
+        repeatTimer = Timer.scheduledTimer(
+            withTimeInterval: repeatInterval,repeats: true) {
+                _ in change(delta)
+            }
+        RunLoop.main.add(repeatTimer!, forMode: .common)
+            
+        
+        
+        
+    }
+    private func stopRepeating() {
+        repeatTimer?.invalidate()
+        repeatTimer = nil
+    }
+}
+struct RepeatButton: View {
+    let symbol: String
+    let onTap: () -> Void
+    let onStartRepeat: () -> Void
+    let onStopRepeat: () -> Void
+    let size: CGFloat
+    @State private var isPressed = false
+    @State private var didStartRepeat = false
+    @State private var startRepeatWork: DispatchWorkItem?
+    var body: some View {
+        Text(symbol)
+            .font(.system(size: 42, weight: .medium))
+
+            .frame(width: size, height: size)
+            .background(symbol == "+" ? FocusColors.darkerBackground : Color.white)
+
+            .foregroundColor(symbol == "+" ? Color.white: Color.black)
+            .contentShape(Rectangle())
+            .scaleEffect(isPressed ? 0.9 : 1)
+            .opacity(isPressed ? 0.7 : 1)
+            .animation(.easeOut(duration: 0.12), value: isPressed)
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !isPressed else {return}
+                        isPressed = true;
+                        didStartRepeat = false;
+                        
+                        onTap()
+                        
+                        let work = DispatchWorkItem {
+                            guard isPressed else {return}
+                            didStartRepeat = true;
+                            onStartRepeat()
+                        }
+                        
+                        startRepeatWork = work
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+                    }
+                    .onEnded{ _ in
+                        startRepeatWork?.cancel()
+                        startRepeatWork = nil
+                        if didStartRepeat {
+                            onStopRepeat()
+                            
+                        } else {
+                            onTap()
+                        }
+                        isPressed = false
+                        didStartRepeat = false
+                    }
+            )
+    }
+}
+
+struct SaveButton: View {
+    
+    var body: some View {
+        Text("Save Goal").font(.system(size:24, weight:.regular)).frame(maxWidth:.infinity).frame(height: 60)
+            .background(
+                RoundedRectangle(cornerRadius:10, style: .continuous).fill(FocusColors.background)
+            )
+    }
+}
 enum FocusColors {
     static let background = Color(
         red: 217.0 / 255.0,
         green: 217.0 / 255.0,
         blue: 217.0 / 255.0
+    )
+    static let darkerBackground = Color (
+        red: 96.0 / 255.0,
+        green: 96.0 / 255.0,
+        blue:  96.0 / 255.0
     )
     
     static let tempGreen = Color(
@@ -374,11 +543,21 @@ enum CategoryID: String, Codable, CaseIterable, Identifiable {
         }
     }
 }
+enum GoalType: String, Codable, CaseIterable, Identifiable {
+    case Limit, Prioritize
+    var id: String{rawValue}
+    var title: String {
+        switch self {
+        case .Limit: return "Limit"
+        case .Prioritize: return "Prioritize"
+        }
+    }
+}
 struct CategoryUsage: Identifiable, Codable {
     var id: CategoryID
     var usage: Int
     var maxUsage: Int
-    var type: String
+    var type: GoalType
 }
 func formatSeconds(_ seconds: Int) -> String {
     let hours = seconds / 3600
@@ -386,8 +565,8 @@ func formatSeconds(_ seconds: Int) -> String {
     return String(hours > 0 ? "\(hours) hr \(mins) min" : "\(mins) min")
 }
 let mockUsage: [CategoryUsage] = [
-    .init(id: .creativity, usage: 3600, maxUsage: 7200, type: "Limit"),
-    .init(id: .productivity, usage: 1800, maxUsage: 7200, type: "Prioritize")
+    .init(id: .creativity, usage: 3600, maxUsage: 7200, type: .Limit),
+    .init(id: .productivity, usage: 1800, maxUsage: 7200, type: .Prioritize)
 ]
 #Preview {
     FocusView()
