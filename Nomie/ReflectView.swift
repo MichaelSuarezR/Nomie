@@ -293,6 +293,7 @@ struct ReflectCard<Content: View>: View {
 
 struct ReflectSoftCard<Content: View>: View {
     let content: Content
+    private let fixedHeight: CGFloat = 210
 
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
@@ -301,7 +302,7 @@ struct ReflectSoftCard<Content: View>: View {
     var body: some View {
         content
             .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
+            .frame(maxWidth: .infinity, minHeight: fixedHeight, maxHeight: fixedHeight, alignment: .center)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(Color.white.opacity(0.7))
@@ -1086,6 +1087,7 @@ struct SelfJournalView: View {
     @State private var entryTags: [UUID: Set<JournalTag>] = [:]
     @State private var placedStamps: [ReflectPlacedStamp] = []
     @State private var earnedStamps: [ReflectStampDefinition] = []
+    @State private var selectedEntryID: UUID? = nil
     @FocusState private var isEntryFocused: Bool
     private let today = Date()
     private let calendar = Calendar.current
@@ -1360,7 +1362,8 @@ struct SelfJournalView: View {
                     entries: $journalEntries,
                     placedStamps: $placedStamps,
                     loggedMoods: $loggedMoods,
-                    entryTags: $entryTags
+                    entryTags: $entryTags,
+                    selectedEntryID: $selectedEntryID
                 )
             }
             .padding(.horizontal, 20)
@@ -1394,11 +1397,15 @@ struct SelfJournalView: View {
             if journalEntries.isEmpty {
                 journalEntries = normalizeEntries(ReflectJournalStore.loadEntries())
             }
+            if entryTags.isEmpty {
+                entryTags = ReflectJournalTagStore.loadTags()
+            }
             let todayKey = ReflectDateKey(date: today, calendar: calendar)
             if let todayEntry = journalEntries.first(where: { ReflectDateKey(date: $0.date, calendar: calendar) == todayKey }) {
                 promptResponse = todayEntry.promptResponse
                 prompt = todayEntry.prompt
                 onPromptChange(todayEntry.prompt)
+                selectedEntryID = todayEntry.id
             } else {
                 let newEntry = ReflectJournalEntry(
                     date: today,
@@ -1407,10 +1414,14 @@ struct SelfJournalView: View {
                     journalText: ""
                 )
                 journalEntries.insert(newEntry, at: 0)
+                selectedEntryID = newEntry.id
             }
         }
         .onChange(of: journalEntries) { _ in
             ReflectJournalStore.saveEntries(journalEntries)
+        }
+        .onChange(of: entryTags) { _ in
+            ReflectJournalTagStore.saveTags(entryTags)
         }
         .onChange(of: prompt) { _ in
             upsertPromptForToday()
@@ -1579,91 +1590,78 @@ struct ReflectLinedPaper: View {
     }
 }
 
+enum JournalSortOption: String, CaseIterable, Identifiable {
+    case recent = "Recent"
+    case oldest = "Oldest"
+    case tags = "Tags"
+
+    var id: String { rawValue }
+}
 
 struct ReflectNotebookView: View {
     @Binding var entries: [ReflectJournalEntry]
     @Binding var placedStamps: [ReflectPlacedStamp]
     @Binding var loggedMoods: [ReflectDateKey: ReflectMoodOption]
     @Binding var entryTags: [UUID: Set<JournalTag>]
-    private let headerHeight: CGFloat = 44
-    @State private var selectedEntryID: UUID? = nil
+    @Binding var selectedEntryID: UUID?
     @FocusState private var focusedEntryID: UUID?
     private let calendar = Calendar.current
     @State private var shareItems: [Any] = []
     @State private var showShareSheet = false
+    private let cardCornerRadius: CGFloat = 24
+    @State private var searchText: String = ""
+    @State private var sortOption: JournalSortOption = .recent
+    @State private var selectedTag: JournalTag? = nil
+    @State private var showEntryDetail = false
 
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let sortedEntryIndexes = entries.indices.sorted { entries[$0].date < entries[$1].date }
+            let filteredEntries = filteredAndSortedEntries()
             let selectedEntry = entries.first { $0.id == selectedEntryID }
+            let fallbackEntry = entries.sorted { $0.date < $1.date }.last
             let selectedMood: ReflectMoodOption? = {
                 guard let date = selectedEntry?.date else { return nil }
                 let key = ReflectDateKey(date: date, calendar: calendar)
                 return loggedMoods[key]
             }()
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white,
-                                Color(red: 0.98, green: 0.97, blue: 0.95)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                    .fill(Color.white)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .stroke(Color.black.opacity(0.5), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
                     )
-                    .shadow(color: Color.black.opacity(0.18), radius: 14, x: 0, y: 8)
-
-                ReflectLinedPaper()
-                    .padding(.leading, 28)
-                    .padding(.trailing, 24)
-                    .padding(.top, headerHeight + 20)
-                    .opacity(entries.isEmpty ? 0.16 : 0.3)
-
-                HStack(spacing: 12) {
-                    VStack(spacing: 8) {
-                        ForEach(0..<12, id: \.self) { _ in
-                            Capsule()
-                                .fill(Color.black.opacity(0.25))
-                                .frame(width: 28, height: 5)
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.white.opacity(0.7), lineWidth: 1)
-                                )
-                        }
-                    }
-                    .padding(.leading, 12)
-
-                    Spacer()
-                }
+                    .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 6)
 
                 VStack(alignment: .leading, spacing: 0) {
-                    HStack {
+                    HStack(spacing: 8) {
+                        if showEntryDetail {
+                            Button {
+                                showEntryDetail = false
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.black.opacity(0.75))
+                                    .frame(width: 32, height: 32)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.black.opacity(0.06))
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+
                         Text("My Journal")
-                            .font(.custom("Georgia", size: 20))
+                            .font(.custom("Georgia", size: 22))
                             .foregroundStyle(Color.black.opacity(0.8))
                         Spacer()
-                        Text("\(entries.count) entries")
-                            .font(.custom("AvenirNext-Medium", size: 11))
-                            .foregroundStyle(Color.black.opacity(0.45))
-                    }
-                    .padding(.top, 18)
-                    .padding(.horizontal, 28)
-
-                    HStack {
-                        Spacer()
                         Button {
-                            guard let selectedEntry else { return }
-                            let tagTitles = entryTags[selectedEntry.id, default: []]
+                            guard let entryToShare = selectedEntry ?? fallbackEntry else { return }
+                            let tagTitles = entryTags[entryToShare.id, default: []]
                                 .sorted(by: { $0.title < $1.title })
                                 .map(\.title)
-                            let shareCard = ShareableJournalCard(entry: selectedEntry, tagTitles: tagTitles)
+                            let shareCard = ShareableJournalCard(entry: entryToShare, tagTitles: tagTitles)
                             let renderer = ImageRenderer(content: shareCard)
                             renderer.scale = UIScreen.main.scale
                             if let image = renderer.uiImage {
@@ -1671,131 +1669,252 @@ struct ReflectNotebookView: View {
                                 showShareSheet = true
                             }
                         } label: {
-                            Label("Share", systemImage: "square.and.arrow.up")
-                                .font(.custom("AvenirNext-Medium", size: 12))
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(Color.black.opacity(0.75))
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
+                                .padding(10)
                                 .background(
-                                    Capsule()
-                                        .fill(Color.black.opacity(0.08))
+                                    Circle()
+                                        .fill(Color.black.opacity(0.06))
                                 )
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.top, 6)
-                    .padding(.horizontal, 28)
+                    .padding(.top, 18)
+                    .padding(.horizontal, 24)
 
                     Rectangle()
-                        .fill(Color.black.opacity(0.08))
+                        .fill(Color.black.opacity(0.06))
                         .frame(height: 1)
-                        .padding(.horizontal, 28)
+                        .padding(.horizontal, 24)
 
-                    if entries.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: "book.closed")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(Color.black.opacity(0.35))
-                            Text("No entries yet")
-                                .font(.custom("AvenirNext-Regular", size: 13))
-                                .foregroundStyle(Color.black.opacity(0.55))
-                            Text("Start with today's prompt above, then write freely here.")
-                                .font(.custom("AvenirNext-Regular", size: 11))
-                                .foregroundStyle(Color.black.opacity(0.4))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 34)
-                    } else {
-                        TabView(selection: $selectedEntryID) {
-                            ForEach(sortedEntryIndexes, id: \.self) { index in
-                                let entry = entries[index]
-                                let promptLine = ReflectJournalPrompt.filledPrompt(
-                                    entry.prompt,
-                                    with: entry.promptResponse
-                                )
-                                let tags = entryTags[entry.id, default: []]
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text(ReflectJournalPrompt.dateLabel(entry.date))
-                                        .font(.custom("AvenirNext-Medium", size: 12))
-                                        .foregroundStyle(Color.black.opacity(0.6))
+                    if showEntryDetail {
+                        if let entryIndex = entries.firstIndex(where: { $0.id == selectedEntryID }) {
+                            let entry = entries[entryIndex]
+                            let promptLine = ReflectJournalPrompt.filledPrompt(
+                                entry.prompt,
+                                with: entry.promptResponse
+                            )
+                            let tags = entryTags[entry.id, default: []]
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(ReflectJournalPrompt.dateLabel(entry.date))
+                                    .font(.custom("AvenirNext-Medium", size: 11))
+                                    .foregroundStyle(Color.black.opacity(0.55))
+                                Group {
                                     if entry.promptResponse.isEmpty {
                                         Text(ReflectJournalPrompt.displayPrompt(entry.prompt))
-                                            .font(.custom("Georgia", size: 18))
-                                            .foregroundStyle(Color.black.opacity(0.85))
                                     } else {
                                         promptLine
-                                            .font(.custom("Georgia", size: 18))
-                                            .foregroundStyle(Color.black.opacity(0.85))
                                     }
-                                    if !tags.isEmpty {
-                                        HStack(spacing: 6) {
-                                            ForEach(tags.sorted(by: { $0.title < $1.title })) { tag in
-                                                Text(tag.title)
-                                                    .font(.custom("AvenirNext-Medium", size: 10))
-                                                    .foregroundStyle(Color.black.opacity(0.7))
-                                                    .padding(.vertical, 4)
-                                                    .padding(.horizontal, 8)
-                                                    .background(
-                                                        Capsule()
-                                                            .fill(tag.color.opacity(0.2))
-                                                    )
-                                            }
-                                        }
-                                    }
-                                    ZStack(alignment: .topLeading) {
-                                        TextEditor(text: $entries[index].journalText)
-                                            .font(.custom("AvenirNext-Regular", size: 14))
-                                            .foregroundStyle(Color.black.opacity(0.8))
-                                            .scrollContentBackground(.hidden)
-                                            .frame(minHeight: 120)
-                                            .focused($focusedEntryID, equals: entry.id)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                                    .fill(Color.white.opacity(0.7))
-                                                    .overlay(
-                                                        ReflectLinedPaper()
-                                                            .padding(.horizontal, 10)
-                                                            .padding(.top, 8)
-                                                            .opacity(0.4)
-                                                    )
-                                                    .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 4)
-                                            )
-
-                                        if entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                            Text("Tap to write...")
-                                                .font(.custom("AvenirNext-Regular", size: 13))
-                                                .foregroundStyle(Color.black.opacity(0.35))
-                                                .padding(.horizontal, 12)
-                                                .padding(.top, 12)
+                                }
+                                .font(.custom("Georgia", size: 20))
+                                .foregroundStyle(Color.black.opacity(0.86))
+                                .fixedSize(horizontal: false, vertical: true)
+                                if !tags.isEmpty {
+                                    HStack(spacing: 6) {
+                                        ForEach(tags.sorted(by: { $0.title < $1.title })) { tag in
+                                            Text(tag.title)
+                                                .font(.custom("AvenirNext-Medium", size: 10))
+                                                .foregroundStyle(Color.black.opacity(0.7))
+                                                .padding(.vertical, 4)
+                                                .padding(.horizontal, 8)
+                                                .background(
+                                                    Capsule()
+                                                        .fill(tag.color.opacity(0.2))
+                                                )
                                         }
                                     }
                                 }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                                .padding(.top, 6)
-                                .padding(.horizontal, 44)
-                                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                                .tag(entry.id)
+                                ZStack(alignment: .topLeading) {
+                                    TextEditor(text: $entries[entryIndex].journalText)
+                                        .font(.custom("AvenirNext-Regular", size: 14))
+                                        .foregroundStyle(Color.black.opacity(0.82))
+                                        .scrollContentBackground(.hidden)
+                                        .frame(minHeight: 140)
+                                        .focused($focusedEntryID, equals: entry.id)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .fill(Color.black.opacity(0.03))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                                )
+                                        )
+
+                                    if entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        Text("Tap to write...")
+                                            .font(.custom("AvenirNext-Regular", size: 13))
+                                            .foregroundStyle(Color.black.opacity(0.35))
+                                            .padding(.horizontal, 12)
+                                            .padding(.top, 12)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 24)
+                            .padding(.top, 16)
+                        } else {
+                            VStack(spacing: 8) {
+                                Image(systemName: "book.closed")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(Color.black.opacity(0.35))
+                                Text("Select an entry")
+                                    .font(.custom("AvenirNext-Regular", size: 13))
+                                    .foregroundStyle(Color.black.opacity(0.55))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 34)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 10) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Color.black.opacity(0.45))
+                                    TextField("Search answers", text: $searchText)
+                                        .font(.custom("AvenirNext-Regular", size: 12))
+                                        .foregroundStyle(Color.black.opacity(0.8))
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 12)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Color.black.opacity(0.04))
+                                )
+
+                                Menu {
+                                    ForEach(JournalSortOption.allCases) { option in
+                                        Button(option.rawValue) {
+                                            sortOption = option
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Text(sortOption.rawValue)
+                                            .font(.custom("AvenirNext-Medium", size: 11))
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 10, weight: .semibold))
+                                    }
+                                    .foregroundStyle(Color.black.opacity(0.7))
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 12)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.black.opacity(0.06))
+                                    )
+                                }
+                            }
+
+                            if sortOption == .tags {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        Button {
+                                            selectedTag = nil
+                                        } label: {
+                                            Text("All Tags")
+                                                .font(.custom("AvenirNext-Medium", size: 11))
+                                                .foregroundStyle(selectedTag == nil ? Color.black.opacity(0.9) : Color.black.opacity(0.6))
+                                                .padding(.vertical, 6)
+                                                .padding(.horizontal, 12)
+                                                .background(
+                                                    Capsule()
+                                                        .fill(selectedTag == nil ? Color.black.opacity(0.08) : Color.black.opacity(0.04))
+                                                )
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        ForEach(JournalTag.allCases) { tag in
+                                            let isSelected = selectedTag == tag
+                                            Button {
+                                                selectedTag = tag
+                                            } label: {
+                                                Text(tag.title)
+                                                    .font(.custom("AvenirNext-Medium", size: 11))
+                                                    .foregroundStyle(isSelected ? Color.black.opacity(0.9) : Color.black.opacity(0.6))
+                                                    .padding(.vertical, 6)
+                                                    .padding(.horizontal, 12)
+                                                    .background(
+                                                        Capsule()
+                                                            .fill(isSelected ? tag.color.opacity(0.25) : Color.black.opacity(0.04))
+                                                    )
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                    }
+                                    .padding(.horizontal, 2)
+                                }
                             }
                         }
-                        .tabViewStyle(.page(indexDisplayMode: .always))
-                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                        .onAppear {
-                            if selectedEntryID == nil {
-                                selectedEntryID = sortedEntryIndexes.last.map { entries[$0].id }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 12)
+
+                        if filteredEntries.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "book.closed")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundStyle(Color.black.opacity(0.35))
+                                Text(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No entries yet" : "No matching entries")
+                                    .font(.custom("AvenirNext-Regular", size: 13))
+                                    .foregroundStyle(Color.black.opacity(0.55))
+                                Text(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Start with today's prompt above, then write freely here." : "Try a different search or tag.")
+                                    .font(.custom("AvenirNext-Regular", size: 11))
+                                    .foregroundStyle(Color.black.opacity(0.4))
                             }
-                        }
-                        .onChange(of: entries) { _ in
-                            if let selectedEntryID,
-                               sortedEntryIndexes.contains(where: { entries[$0].id == selectedEntryID }) {
-                                return
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 34)
+                        } else {
+                            ScrollView {
+                                VStack(spacing: 0) {
+                                    ForEach(filteredEntries.indices, id: \.self) { index in
+                                        let entry = filteredEntries[index]
+                                        let promptLine = ReflectJournalPrompt.filledPrompt(
+                                            entry.prompt,
+                                            with: entry.promptResponse
+                                        )
+                                        Button {
+                                            selectedEntryID = entry.id
+                                            focusedEntryID = entry.id
+                                            showEntryDetail = true
+                                        } label: {
+                                            VStack(alignment: .leading, spacing: 6) {
+                                                Text(ReflectJournalPrompt.dateLabel(entry.date))
+                                                    .font(.custom("AvenirNext-Medium", size: 11))
+                                                    .foregroundStyle(Color.black.opacity(0.55))
+                                                Group {
+                                                    if entry.promptResponse.isEmpty {
+                                                        Text(ReflectJournalPrompt.displayPrompt(entry.prompt))
+                                                    } else {
+                                                        promptLine
+                                                    }
+                                                }
+                                                .font(.custom("Georgia", size: 18))
+                                                .foregroundStyle(Color.black.opacity(0.85))
+                                                .lineLimit(2)
+                                            }
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.vertical, 12)
+                                            .padding(.horizontal, 24)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        if index < filteredEntries.count - 1 {
+                                            Rectangle()
+                                                .fill(Color.black.opacity(0.06))
+                                                .frame(height: 1)
+                                                .padding(.horizontal, 24)
+                                        }
+                                    }
+                                }
                             }
-                            selectedEntryID = sortedEntryIndexes.last.map { entries[$0].id }
+                            .padding(.top, 6)
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                if let selectedMood {
+                if showEntryDetail, let selectedMood {
                     MoodAssetImage(
                         assetName: selectedMood.assetName,
                         intensity: 0.85,
@@ -1807,26 +1926,80 @@ struct ReflectNotebookView: View {
                     .padding(.bottom, 18)
                 }
 
-                ForEach($placedStamps) { $stamp in
-                    ReflectStampBadge(stamp: stamp.stamp)
-                        .frame(width: 54, height: 54)
-                        .position(stamp.position)
-                        .gesture(
-                            DragGesture()
-                                .onChanged { value in
-                                    stamp.position = ReflectStampPlacement.clampedPosition(
-                                        proposed: value.location,
-                                        in: size,
-                                        stampSize: CGSize(width: 54, height: 54)
-                                    )
-                                }
-                        )
+                if showEntryDetail {
+                    ForEach($placedStamps) { $stamp in
+                        ReflectStampBadge(stamp: stamp.stamp)
+                            .frame(width: 54, height: 54)
+                            .position(stamp.position)
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        stamp.position = ReflectStampPlacement.clampedPosition(
+                                            proposed: value.location,
+                                            in: size,
+                                            stampSize: CGSize(width: 54, height: 54)
+                                        )
+                                    }
+                            )
+                    }
+                }
+            }
+            .onAppear {
+                if selectedEntryID == nil {
+                    selectedEntryID = fallbackEntry?.id
+                }
+            }
+            .onChange(of: entries) { _ in
+                if let selectedEntryID,
+                   entries.contains(where: { $0.id == selectedEntryID }) {
+                    return
+                }
+                selectedEntryID = entries.sorted { $0.date < $1.date }.last?.id
+            }
+            .onChange(of: searchText) { _ in
+                showEntryDetail = false
+                if !filteredAndSortedEntries().contains(where: { $0.id == selectedEntryID }) {
+                    selectedEntryID = filteredAndSortedEntries().first?.id
+                }
+            }
+            .onChange(of: sortOption) { _ in
+                showEntryDetail = false
+                if !filteredAndSortedEntries().contains(where: { $0.id == selectedEntryID }) {
+                    selectedEntryID = filteredAndSortedEntries().first?.id
+                }
+            }
+            .onChange(of: selectedTag) { _ in
+                showEntryDetail = false
+                if !filteredAndSortedEntries().contains(where: { $0.id == selectedEntryID }) {
+                    selectedEntryID = filteredAndSortedEntries().first?.id
                 }
             }
         }
         .frame(height: 380)
         .sheet(isPresented: $showShareSheet) {
             ActivityView(activityItems: shareItems)
+        }
+    }
+
+    private func filteredAndSortedEntries() -> [ReflectJournalEntry] {
+        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var results = entries
+        if !trimmedQuery.isEmpty {
+            let lowered = trimmedQuery.lowercased()
+            results = results.filter { entry in
+                entry.promptResponse.lowercased().contains(lowered)
+            }
+        }
+
+        if sortOption == .tags, let selectedTag {
+            results = results.filter { entryTags[$0.id, default: []].contains(selectedTag) }
+        }
+
+        switch sortOption {
+        case .oldest:
+            return results.sorted { $0.date < $1.date }
+        case .recent, .tags:
+            return results.sorted { $0.date > $1.date }
         }
     }
 }
@@ -2063,6 +2236,36 @@ struct ReflectJournalStore {
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(entries) else { return }
         UserDefaults.standard.set(data, forKey: entriesKey)
+    }
+}
+
+struct ReflectJournalTagStore {
+    private struct TagRecord: Codable {
+        let id: UUID
+        let tags: [String]
+    }
+
+    private static let tagsKey = "reflect.journal.tags"
+
+    static func loadTags() -> [UUID: Set<JournalTag>] {
+        guard let data = UserDefaults.standard.data(forKey: tagsKey) else { return [:] }
+        let decoder = JSONDecoder()
+        guard let records = try? decoder.decode([TagRecord].self, from: data) else { return [:] }
+        var results: [UUID: Set<JournalTag>] = [:]
+        for record in records {
+            let tags = record.tags.compactMap { JournalTag(rawValue: $0) }
+            results[record.id] = Set(tags)
+        }
+        return results
+    }
+
+    static func saveTags(_ tagsByID: [UUID: Set<JournalTag>]) {
+        let records = tagsByID.map { id, tags in
+            TagRecord(id: id, tags: tags.map(\.rawValue))
+        }
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(records) else { return }
+        UserDefaults.standard.set(data, forKey: tagsKey)
     }
 }
 
