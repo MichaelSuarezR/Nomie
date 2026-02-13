@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct FocusView: View {
+    
     @State private var usage: [CategoryUsage] = [
         .init(id: .connection, usage: 4 * 3600 + 32 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
         .init(id: .creativity, usage: 3 * 3600 + 45 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
@@ -25,6 +26,7 @@ struct FocusView: View {
                 }
             }
             .ignoresSafeArea(edges: .top)
+            .background(Color.white)
         }
         .navigationTitle("Focus")
     }
@@ -92,7 +94,7 @@ struct DailyInsights: View {
     var body: some View {
         VStack {
             Text("Daily Insights")
-                .font(.system(size: 32, weight: .medium))
+                .font(.custom("BricolageGrotesque",size: 32)).fontWeight(.bold)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 13)
             Text("You are heavy on the " + category + " apps this " + timeOfDay + ".")
