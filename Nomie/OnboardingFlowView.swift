@@ -5,18 +5,32 @@
 
 import SwiftUI
 import Supabase
+import UIKit
 
 struct OnboardingFlowView: View {
     @EnvironmentObject private var appState: AppState
     @State private var pageIndex = 0
     @State private var selectedGoals: Set<String> = []
     @State private var authMode: AuthView.Mode = .signUp
+    @State private var showLoginSheet = false
+    @State private var showSignUpSheet = false
     private let totalPages = 4
 
     var body: some View {
         let isAuthed = appState.session != nil
+        let isAuthSheetVisible = showLoginSheet || showSignUpSheet
+        let backgroundStyle: OnboardingWelcomeBackground.Style = showLoginSheet
+            ? .login
+            : (showSignUpSheet ? .signup : .welcome)
 
-        VStack(spacing: 0) {
+        ZStack {
+            if pageIndex == 0 {
+                OnboardingWelcomeBackground(style: backgroundStyle)
+            } else {
+                Color.white.ignoresSafeArea()
+            }
+
+            VStack(spacing: 0) {
             OnboardingTopBar(
                 canGoBack: pageIndex > 0,
                 showsSkip: isAuthed && pageIndex > 1,
@@ -30,13 +44,16 @@ struct OnboardingFlowView: View {
                 switch pageIndex {
                 case 0:
                     OnboardingWelcomeView(
+                        isAuthSheetVisible: isAuthSheetVisible,
                         onSignUp: {
-                            authMode = .signUp
-                            pageIndex = 1
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+                                showSignUpSheet = true
+                            }
                         },
                         onLogIn: {
-                            authMode = .logIn
-                            pageIndex = 1
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+                                showLoginSheet = true
+                            }
                         }
                     )
                 case 1:
@@ -74,16 +91,70 @@ struct OnboardingFlowView: View {
             } else {
                 Spacer().frame(height: 44)
             }
+            }
+
+            if pageIndex == 0, showLoginSheet {
+                Color.black.opacity(0.001)
+                    .ignoresSafeArea()
+
+                VStack {
+                    Spacer()
+                    LoginSheetView(
+                        onClose: {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+                                showLoginSheet = false
+                            }
+                        },
+                        onSignUp: {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+                                showLoginSheet = false
+                                showSignUpSheet = true
+                            }
+                        }
+                    )
+                    .transition(.move(edge: .bottom))
+                }
+                .ignoresSafeArea(edges: .bottom)
+            }
+
+            if pageIndex == 0, showSignUpSheet {
+                Color.black.opacity(0.001)
+                    .ignoresSafeArea()
+
+                VStack {
+                    Spacer()
+                    SignUpSheetView(
+                        onClose: {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+                                showSignUpSheet = false
+                            }
+                        },
+                        onLogIn: {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+                                showSignUpSheet = false
+                                showLoginSheet = true
+                            }
+                        }
+                    )
+                    .transition(.move(edge: .bottom))
+                }
+                .ignoresSafeArea(edges: .bottom)
+            }
         }
-        .background(Color.white.ignoresSafeArea())
         .onChange(of: pageIndex) { newValue in
             if newValue > 1 && appState.session == nil {
                 pageIndex = 1
             }
         }
         .onChange(of: appState.session?.user.id) { _ in
-            if appState.session != nil, pageIndex == 1 {
-                pageIndex = 2
+            if appState.session != nil {
+                if showLoginSheet || showSignUpSheet {
+                    showLoginSheet = false
+                    showSignUpSheet = false
+                    pageIndex = 2
+                } else if pageIndex == 1 {
+                    pageIndex = 2
+                }
             }
         }
     }
@@ -159,57 +230,612 @@ private struct OnboardingPageIndicator: View {
 }
 
 private struct OnboardingWelcomeView: View {
+    let isAuthSheetVisible: Bool
     let onSignUp: () -> Void
     let onLogIn: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 0.98, green: 0.77, blue: 0.62),
+                                    Color(red: 0.95, green: 0.52, blue: 0.58),
+                                    Color(red: 0.87, green: 0.36, blue: 0.46)
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 18
+                            )
+                        )
+                        .frame(width: 16, height: 16)
+                        .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
+
+                    Text("NOMIE")
+                        .font(.system(size: 18, weight: .semibold, design: .serif))
+                        .foregroundColor(.black.opacity(0.75))
+                        .tracking(1.5)
+                }
+            }
+            .opacity(isAuthSheetVisible ? 0 : 1)
+            .animation(.easeInOut(duration: 0.3), value: isAuthSheetVisible)
+            .padding(.horizontal, 28)
+            .padding(.top, 5)
+
+            Spacer(minLength: 500)
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Hello")
-                    .font(.system(size: 42, weight: .bold))
-                    .foregroundColor(.black)
-                Text("Ready to unlock your digital nutrition?")
-                    .font(.title3)
-                    .foregroundColor(.black.opacity(0.7))
+                    .font(.system(size: 44, weight: .regular, design: .serif))
+                    .italic()
+                    .foregroundColor(Color.black.opacity(0.75))
+                Text("Ready to unlock your zine?")
+                    .font(.system(size: 17, weight: .regular, design: .serif))
+                    .foregroundColor(Color.black.opacity(0.65))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 28)
-            .padding(.top, 8)
 
-            MoodCloudView()
-                .frame(height: 380)
-                .padding(.horizontal, -8)
-
-            Spacer()
+            Spacer(minLength: 100)
 
             VStack(spacing: 12) {
                 Button(action: onSignUp) {
                     Text("Sign Up")
-                        .font(.headline)
+                        .font(.system(size: 18, weight: .medium, design: .serif))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Color.gray.opacity(0.2))
-                        .foregroundColor(.black)
+                        .background(Color.white.opacity(0.7))
+                        .foregroundColor(Color.black.opacity(0.75))
+                        .overlay(
+                            Capsule().stroke(Color.black.opacity(0.55), lineWidth: 1)
+                        )
                         .clipShape(Capsule())
                 }
 
                 Button(action: onLogIn) {
                     Text("Log In")
-                        .font(.headline)
+                        .font(.system(size: 18, weight: .medium, design: .serif))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Color.white)
-                        .foregroundColor(.black)
+                        .foregroundColor(Color.black.opacity(0.7))
                         .overlay(
-                            Capsule().stroke(Color.black.opacity(0.25), lineWidth: 1)
+                            Capsule().stroke(Color.black.opacity(0.55), lineWidth: 1)
                         )
                 }
             }
             .padding(.horizontal, 28)
-            .padding(.bottom, -30)
+            .padding(.bottom, 24)
         }
-        .padding(.top, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
+
+private struct OnboardingWelcomeBackground: View {
+    enum Style {
+        case welcome
+        case login
+        case signup
+    }
+
+    let style: Style
+
+    var body: some View {
+        ZStack {
+            if style == .welcome {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.98, green: 0.95, blue: 0.82),
+                        Color(red: 0.99, green: 0.82, blue: 0.70),
+                        Color(red: 0.98, green: 0.70, blue: 0.60)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else if style == .login {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.90, green: 0.92, blue: 0.78),
+                        Color(red: 0.76, green: 0.90, blue: 0.80),
+                        Color(red: 0.60, green: 0.86, blue: 0.88)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.98, green: 0.83, blue: 0.70),
+                        Color(red: 0.97, green: 0.67, blue: 0.58),
+                        Color(red: 0.94, green: 0.53, blue: 0.52)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+
+            RadialGradient(
+                colors: [
+                    style == .welcome
+                    ? Color(red: 0.94, green: 0.54, blue: 0.64).opacity(0.95)
+                    : (style == .login
+                       ? Color(red: 0.62, green: 0.86, blue: 0.85).opacity(0.95)
+                       : Color(red: 0.99, green: 0.84, blue: 0.72).opacity(0.92)),
+                    style == .welcome
+                    ? Color(red: 0.97, green: 0.74, blue: 0.66).opacity(0.9)
+                    : (style == .login
+                       ? Color(red: 0.84, green: 0.88, blue: 0.74).opacity(0.9)
+                       : Color(red: 0.96, green: 0.70, blue: 0.58).opacity(0.88)),
+                    style == .welcome
+                    ? Color(red: 0.99, green: 0.92, blue: 0.78).opacity(0.9)
+                    : (style == .login
+                       ? Color(red: 0.94, green: 0.78, blue: 0.62).opacity(0.88)
+                       : Color(red: 0.94, green: 0.52, blue: 0.52).opacity(0.9))
+                ],
+                center: UnitPoint(x: 0.78, y: 0.45),
+                startRadius: 60,
+                endRadius: 420
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.5),
+                    Color.clear,
+                    Color.white.opacity(0.3)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
+    }
+}
+
+private struct LoginSheetView: View {
+    let onClose: () -> Void
+    let onSignUp: () -> Void
+
+    @State private var email = ""
+    @State private var password = ""
+    @State private var rememberMe = false
+    @State private var isLoading = false
+    @State private var message: String?
+    @State private var keyboardHeight: CGFloat = 0
+
+    private let supabase = SupabaseManager.shared
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 18) {
+                HStack {
+                    Button(action: onClose) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.black.opacity(0.6))
+                            .padding(8)
+                            .background(Color.black.opacity(0.06))
+                            .clipShape(Circle())
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 12)
+                .padding(.leading, 12)
+
+                Capsule()
+                    .fill(Color.black.opacity(0.12))
+                    .frame(width: 48, height: 6)
+
+                VStack(spacing: 8) {
+                    Text("Welcome Back")
+                        .font(.system(size: 28, weight: .regular, design: .serif))
+                        .italic()
+                        .foregroundColor(Color.black.opacity(0.8))
+                    Text("Ready to continue?")
+                        .font(.system(size: 16, weight: .regular, design: .serif))
+                        .foregroundColor(Color.black.opacity(0.65))
+                }
+                .padding(.top, 4)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Email")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black.opacity(0.7))
+                        TextField("", text: $email, prompt: Text("Email").foregroundColor(.gray))
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.emailAddress)
+                            .autocorrectionDisabled()
+                            .foregroundColor(.black)
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 14)
+                            .background(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.black.opacity(0.25), lineWidth: 1)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Password")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black.opacity(0.7))
+                        SecureField("", text: $password, prompt: Text("Password").foregroundColor(.gray))
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .foregroundColor(.black)
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 14)
+                            .background(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.black.opacity(0.25), lineWidth: 1)
+                            )
+                    }
+
+                    HStack {
+                        Button(action: { rememberMe.toggle() }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: rememberMe ? "checkmark.square.fill" : "square")
+                                    .foregroundColor(.black.opacity(0.7))
+                                Text("Remember Me")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.black.opacity(0.75))
+                            }
+                        }
+
+                        Spacer()
+
+                        Button("Forgot Password") {
+                        }
+                        .font(.system(size: 14))
+                        .foregroundColor(.black.opacity(0.7))
+                    }
+                }
+                .padding(.horizontal, 30)
+
+                if let message {
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundColor(.black.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+
+                Button(action: submit) {
+                    Text(isLoading ? "Please wait..." : "Log In")
+                        .font(.system(size: 18, weight: .medium, design: .serif))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .foregroundColor(Color.black.opacity(0.75))
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.74, green: 0.88, blue: 0.84),
+                                    Color(red: 0.92, green: 0.86, blue: 0.62)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 6)
+                }
+                .disabled(isLoading || !canSubmit)
+                .padding(.horizontal, 30)
+                .padding(.top, 8)
+
+                Button(action: onSignUp) {
+                    Text("Don’t have an account? ")
+                        .foregroundColor(.black.opacity(0.65))
+                    + Text("Sign up")
+                        .foregroundColor(.black.opacity(0.9))
+                        .fontWeight(.semibold)
+                }
+                .font(.system(size: 14))
+                .padding(.bottom, 22)
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .frame(maxHeight: 540)
+        .frame(maxWidth: .infinity)
+        .background(Color(red: 0.99, green: 0.98, blue: 0.96))
+        .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+        .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: -8)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8 + keyboardHeight)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .animation(.easeOut(duration: 0.25), value: keyboardHeight)
+        .onAppear { keyboardHeight = 0 }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+            let endFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
+            let screenHeight = UIScreen.main.bounds.height
+            let overlap = max(0, screenHeight - endFrame.origin.y)
+            keyboardHeight = overlap > 0 ? overlap : 0
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardHeight = 0
+        }
+    }
+
+    private func submit() {
+        message = nil
+        isLoading = true
+
+        Task {
+            do {
+                try await supabase.auth.signIn(email: email, password: password)
+            } catch {
+                message = error.localizedDescription
+            }
+            isLoading = false
+        }
+    }
+
+    private var canSubmit: Bool {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmedEmail.isEmpty && !password.isEmpty
+    }
+}
+
+private struct SignUpSheetView: View {
+    let onClose: () -> Void
+    let onLogIn: () -> Void
+
+    @State private var firstName = ""
+    @State private var lastName = ""
+    @State private var email = ""
+    @State private var password = ""
+    @State private var confirmPassword = ""
+    @State private var isLoading = false
+    @State private var message: String?
+    @State private var keyboardHeight: CGFloat = 0
+
+    private let supabase = SupabaseManager.shared
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 18) {
+                HStack {
+                    Button(action: onClose) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.black.opacity(0.6))
+                            .padding(8)
+                            .background(Color.black.opacity(0.06))
+                            .clipShape(Circle())
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 12)
+                .padding(.leading, 12)
+
+                Capsule()
+                    .fill(Color.black.opacity(0.12))
+                    .frame(width: 48, height: 6)
+
+                VStack(spacing: 6) {
+                    Text("Create your account")
+                        .font(.system(size: 26, weight: .regular, design: .serif))
+                        .italic()
+                        .foregroundColor(Color.black.opacity(0.8))
+                    Text("Sign up to get started")
+                        .font(.system(size: 16, weight: .regular, design: .serif))
+                        .foregroundColor(Color.black.opacity(0.65))
+                }
+                .padding(.top, 4)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Full Name")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black.opacity(0.7))
+                        HStack(spacing: 10) {
+                        TextField("", text: $firstName, prompt: Text("First").foregroundColor(.gray))
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .foregroundColor(.black)
+                        TextField("", text: $lastName, prompt: Text("Last").foregroundColor(.gray))
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .foregroundColor(.black)
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 14)
+                        .background(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.black.opacity(0.25), lineWidth: 1)
+                        )
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Email")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black.opacity(0.7))
+                    TextField("", text: $email, prompt: Text("Email").foregroundColor(.gray))
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                        .autocorrectionDisabled()
+                        .foregroundColor(.black)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 14)
+                        .background(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.black.opacity(0.25), lineWidth: 1)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Password")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black.opacity(0.7))
+                    SecureField("", text: $password, prompt: Text("Password").foregroundColor(.gray))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .foregroundColor(.black)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 14)
+                        .background(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.black.opacity(0.25), lineWidth: 1)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Confirm Password")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.black.opacity(0.7))
+                    SecureField("", text: $confirmPassword, prompt: Text("Confirm Password").foregroundColor(.gray))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .foregroundColor(.black)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 14)
+                        .background(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.black.opacity(0.25), lineWidth: 1)
+                            )
+                    }
+                }
+                .padding(.horizontal, 30)
+
+                if let message {
+                    Text(message)
+                        .font(.subheadline)
+                        .foregroundColor(.black.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+
+                Button(action: submit) {
+                    Text(isLoading ? "Please wait..." : "Sign Up")
+                        .font(.system(size: 18, weight: .medium, design: .serif))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .foregroundColor(Color.black.opacity(0.75))
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.96, green: 0.83, blue: 0.73),
+                                    Color(red: 0.96, green: 0.74, blue: 0.56)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 6)
+                }
+                .disabled(isLoading || !canSubmit)
+                .padding(.horizontal, 30)
+                .padding(.top, 6)
+
+                Button(action: onLogIn) {
+                    Text("Already have an account? ")
+                        .foregroundColor(.black.opacity(0.65))
+                    + Text("Log In")
+                        .foregroundColor(.black.opacity(0.9))
+                        .fontWeight(.semibold)
+                }
+                .font(.system(size: 14))
+                .padding(.bottom, 22)
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .frame(maxHeight: 600)
+        .frame(maxWidth: .infinity)
+        .background(Color(red: 0.99, green: 0.98, blue: 0.96))
+        .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+        .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: -8)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8 + keyboardHeight)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .animation(.easeOut(duration: 0.25), value: keyboardHeight)
+        .onAppear { keyboardHeight = 0 }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+            let endFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
+            let screenHeight = UIScreen.main.bounds.height
+            let overlap = max(0, screenHeight - endFrame.origin.y)
+            keyboardHeight = overlap > 0 ? overlap : 0
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardHeight = 0
+        }
+    }
+
+    private func submit() {
+        message = nil
+        isLoading = true
+
+        Task {
+            do {
+                let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let trimmedFirst = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedLast = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                guard password == confirmPassword else {
+                    message = "Passwords do not match."
+                    isLoading = false
+                    return
+                }
+
+                guard !trimmedFirst.isEmpty, !trimmedLast.isEmpty else {
+                    message = "Please enter your first and last name."
+                    isLoading = false
+                    return
+                }
+
+                let response = try await supabase.auth.signUp(
+                    email: trimmedEmail,
+                    password: password,
+                    data: [
+                        "first_name": .string(trimmedFirst),
+                        "last_name": .string(trimmedLast)
+                    ]
+                )
+
+                let user = response.user
+                let profile = OnboardingProfileInsert(
+                    id: user.id,
+                    email: trimmedEmail,
+                    first_name: trimmedFirst,
+                    last_name: trimmedLast
+                )
+                try await supabase.database
+                    .from("profiles")
+                    .insert(profile)
+                    .execute()
+            } catch {
+                message = error.localizedDescription
+            }
+            isLoading = false
+        }
+    }
+
+    private var canSubmit: Bool {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !firstName.isEmpty &&
+            !lastName.isEmpty &&
+            !trimmedEmail.isEmpty &&
+            !password.isEmpty &&
+            !confirmPassword.isEmpty
+    }
+}
+
+private struct OnboardingProfileInsert: Encodable {
+    let id: UUID
+    let email: String
+    let first_name: String
+    let last_name: String
 }
 
 
