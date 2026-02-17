@@ -58,6 +58,33 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		6FA69CEA2F3EE09700A2C954 /* Exceptions for "Nomie" folder in "NomieReport" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Fonts/Poppins-Regular.ttf",
+				"Fonts/SortsMillGoudy-Italic.ttf",
+				"Fonts/SortsMillGoudy-Regular.ttf",
+			);
+			target = 07FCB665338048BBB6533A44 /* NomieReport */;
+		};
+		6FA69CEB2F3EE09700A2C954 /* Exceptions for "Nomie" folder in "NomieTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Fonts/Poppins-Regular.ttf",
+				"Fonts/SortsMillGoudy-Italic.ttf",
+				"Fonts/SortsMillGoudy-Regular.ttf",
+			);
+			target = B04FFBFD2F1B1C2C0073190A /* NomieTests */;
+		};
+		6FA69CEC2F3EE09700A2C954 /* Exceptions for "Nomie" folder in "NomieUITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Fonts/Poppins-Regular.ttf",
+				"Fonts/SortsMillGoudy-Italic.ttf",
+				"Fonts/SortsMillGoudy-Regular.ttf",
+			);
+			target = B04FFC072F1B1C2C0073190A /* NomieUITests */;
+		};
 		A4604B96667C4A189F593CB1 /* Exceptions for "NomieReport" folder in "NomieReport" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -87,6 +114,9 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				B04FFC102F1B1C2C0073190A /* Exceptions for "Nomie" folder in "Nomie" target */,
+				6FA69CEA2F3EE09700A2C954 /* Exceptions for "Nomie" folder in "NomieReport" target */,
+				6FA69CEB2F3EE09700A2C954 /* Exceptions for "Nomie" folder in "NomieTests" target */,
+				6FA69CEC2F3EE09700A2C954 /* Exceptions for "Nomie" folder in "NomieUITests" target */,
 			);
 			path = Nomie;
 			sourceTree = "<group>";

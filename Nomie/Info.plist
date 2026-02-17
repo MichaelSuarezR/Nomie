@@ -11,6 +11,10 @@
 	<key>UIAppFonts</key>
 	<array>
 		<string>BricolageGrotesque.ttf</string>
+		<string>BricolageGrotesque-VariableFont_opsz,wdth,wght.ttf</string>
+		<string>SortsMillGoudy-Regular.ttf</string>
+		<string>Poppins-Regular.ttf</string>
+		<string>SortsMillGoudy-Italic.ttf</string>
 	</array>
 </dict>
 </plist>

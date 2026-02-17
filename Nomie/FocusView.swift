@@ -4,9 +4,9 @@
 //
 
 import SwiftUI
-
+import Combine
 struct FocusView: View {
-    
+
     @State private var usage: [CategoryUsage] = [
         .init(id: .connection, usage: 4 * 3600 + 32 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
         .init(id: .creativity, usage: 3 * 3600 + 45 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
@@ -19,74 +19,94 @@ struct FocusView: View {
         NavigationStack {
             ScrollView {
                 VStack {
-                    FocusHeader(name: "Name", streakDays: 8)
-                    DailyInsights(category: "Creativity", timeOfDay: "Morning")
-                    Charts(usage: usage)
-                    GoalsView(usage: $usage)
+                    FocusHeader(name: "Nomie")
+                    DashboardWrapper(streakDays: 8, category: "Creativity", timeOfDay: getTimeOfDayText(), usage: $usage)
                 }
             }
             .ignoresSafeArea(edges: .top)
-            .background(Color.white)
+            .background(Color(FocusColors.tempBackground))
         }
         .navigationTitle("Focus")
+
     }
 }
 
+struct DashboardWrapper: View {
+    let streakDays: Int
+    let category: String
+    let timeOfDay: String
+    @Binding var usage: [CategoryUsage]
+    var body: some View {
+        VStack(spacing: 24) {
+            StreaksBar(streakDays: 8)
+            DailyInsights(category: "Creativity", timeOfDay: timeOfDay)
+            Charts(usage: usage)
+            GoalsView(usage: $usage)
+        }.padding(.horizontal, 21)
+    }
+}
 struct FocusHeader : View {
     let name: String
-    let streakDays: Int
     var body: some View {
         GeometryReader {geo in
             VStack {
-                Text("Hello, " + name)
-                    .font(.system(size: 40, weight: .medium))
-                    .kerning(0)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 12)
-                    .padding(.top, geo.safeAreaInsets.top + 50)
-                HStack {
-                        Text("Streaks:" )
-                        .font(.system(size:20, weight: .medium))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(spacing: 2) {
+                    Text("hello,")
+                        .font(.custom("SortsMillGoudy-Italic", size: 32))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(getTextColor())
+                    Text("\(name)")
+                        .font(.custom("SortsMillGoudy-Regular", size: 40))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(getTextColor())
 
-                        Text("\(streakDays) days")
-                            .font(.system(size:20, weight: .medium))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, 55)
-                }.padding(.leading, 68)
-                    .padding(.top, 10)
-                StreakList()
+                }
             }
-            .frame(maxWidth: .infinity,minHeight: 272,  alignment: .topLeading)
-            .background(FocusColors.background)
+                .padding(.top, geo.safeAreaInsets.top + 111)
+                .padding(.horizontal, 21)
+
+
         }
-        .frame(height:272)
-
-
-        
-
+        .frame(minHeight:272)
     }
 }
-struct tempStreakIcon: View {
-    let color: Color
-    var body : some View {
-        ZStack {
-            Circle()
-                .fill(FocusColors.tempGreen.opacity(1))
-                .blur(radius:3)
-                .frame(width: 90, height: 90)
-        }
-    }
-}
-struct StreakList: View {
+struct StreaksBar : View {
+    let streakDays: Int
     var body: some View {
         HStack {
-            tempStreakIcon(color: FocusColors.tempGreen)
-            tempStreakIcon(color: FocusColors.tempGreen)
-            tempStreakIcon(color: FocusColors.tempGreen)
-        }
+            Text("Streaks:" )
+            .font(.system(size:14, weight: .medium))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 10.5)
+            HStack {
+                Text("\(streakDays)")
+                    .font(.custom("BricolageGrotesque-96ptExtraBold_Regular", size: 32)
+                        .weight(.bold)
+                    )
+                    .frame(alignment: .trailing)
+                    .foregroundStyle(getStreakNumColor())
+                Text("days")
+                    .font(.system(size:14, weight: .medium))
+                    .frame(alignment: .trailing)
+                    .padding(.vertical, 10.5)
+            }
+            
+            
+        }.padding(.horizontal, 12)
+            .padding(.vertical, 2)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .background(Color.white)
+            .cornerRadius(8)
+            .shadow(color: Color(red: 0.58, green: 0.63, blue: 0.34).opacity(0.25), radius: 2, x: 0, y: 3)
+
     }
 }
+struct BannerItem: Identifiable, Equatable {
+    var id = UUID();
+    var imageName: String
+}
+
+
 
 struct DailyInsights: View {
     let category: String
@@ -94,19 +114,29 @@ struct DailyInsights: View {
     var body: some View {
         VStack {
             Text("Daily Insights")
-                .font(.custom("BricolageGrotesque",size: 32)).fontWeight(.bold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 13)
-            Text("You are heavy on the " + category + " apps this " + timeOfDay + ".")
-                .font(.system(size: 20, weight: .medium))
-                .padding(16)
-                .background(
-                    RoundedRectangle(cornerRadius:30).fill(FocusColors.background)
-                        .shadow(color: Color.black.opacity(0.5), radius: 1, x: 0, y: 4)
-                        
-                )
+                .font(.custom("SortsMillGoudy-Regular",size: 20))
+                .foregroundStyle(getTextColor())
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                
+                
+            Text("You are heavy on the '\(category)' apps " + timeOfDay + ".")
+                .font(.custom("Poppins-Regular", size: 14))
+                .foregroundStyle(getTextColor())
+                .frame(maxWidth:.infinity, alignment:.topLeading)
 
-        }
+        }.padding(.horizontal, 12)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white)
+            )
+            .shadow(color: Color(red: 0.69, green: 0.76, blue: 0.36).opacity(0.25), radius: 2, x: 0, y: 4)
+
+
+
+
+
     }
 }
 struct Charts: View {
@@ -115,36 +145,135 @@ struct Charts: View {
         usage.reduce(0) { $0 + $1.usage }
     }
     var body: some View {
-        VStack {
-            ChartHeader(totalSeconds: totalSeconds)
-            RadarChart()
-            BarChartView(usage: usage)
+        VStack(spacing: 20) {
+            DashboardRadarChart().frame(height:280)
+            BarChartView(usage: usage).padding(.horizontal,12)
+            TotalUsage(totalSeconds: totalSeconds).padding(.bottom, 16)
+
             
-        }
+        }.background(RoundedRectangle(cornerRadius: 8).fill(Color.white)).shadow(color: Color(red: 0.58, green: 0.63, blue: 0.34).opacity(0.25), radius: 2, x: 0, y: 3)
         
     }
 }
-struct ChartHeader: View {
+struct TotalUsage: View {
     let totalSeconds: Int;
 
     var body: some View {
         Text("Total Usage: " + formatSeconds(totalSeconds))
-            .font(.system(size: 32, weight: .medium ))
-            .italic()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 13)
+            .font(.custom("SortsMillGoudy-Regular", size: 20))
+            .frame(maxWidth: .infinity, alignment: .center)
+            .foregroundStyle(getTextColor())
+
     }
 }
-struct RadarChart: View {
+private struct DashboardRadarChart: View {
+    private let labels = ["drifting", "connection", "creativity", "entertainment", "learning", "productivity"]
+    private let seriesA: [CGFloat] = [0.85, 0.45, 0.35, 0.7, 0.25, 0.3]
+    private let seriesB: [CGFloat] = [0.45, 0.6, 0.4, 0.25, 0.75, 0.7]
+
     var body: some View {
-        RoundedRectangle(cornerRadius: 20)
-            .fill(Color.gray.opacity(0.5))
-            .frame(width: 377, height:377)
-            .overlay{
-                Text("PlaceHolder")
+        GeometryReader { proxy in
+            let size = min(proxy.size.width, proxy.size.height)
+            let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+            let radius = size * 0.35
+
+            ZStack {
+                DashboardRadarGrid(center: center, radius: radius)
+
+                DashboardRadarPolygon(values: seriesA, center: center, radius: radius)
+                    .stroke(Color.red.opacity(0.7), lineWidth: 1.5)
+                    .background(
+                        DashboardRadarPolygon(values: seriesA, center: center, radius: radius)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.95, green: 0.25, blue: 0.4),
+                                        Color(red: 0.7, green: 0.56, blue: 0.56)
+                                        
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            ).opacity(0.3)
+                    )
+
+
+
+                ForEach(labels.indices, id: \.self) { index in
+                    let angle = angleForIndex(index)
+                    let labelPoint = point(center: center, radius: radius * 1.15, angle: angle)
+                    Text(labels[index])
+                        .font(.custom("AvenirNext-Regular", size: 11))
+                        .foregroundColor(Color.black.opacity(0.7))
+                        .position(labelPoint)
+                }
             }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func angleForIndex(_ index: Int) -> CGFloat {
+        CGFloat(-Double.pi / 2) + CGFloat(index) * (CGFloat(Double.pi * 2) / 6)
+    }
+
+    private func point(center: CGPoint, radius: CGFloat, angle: CGFloat) -> CGPoint {
+        CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius)
     }
 }
+
+private struct DashboardRadarGrid: View {
+    let center: CGPoint
+    let radius: CGFloat
+
+    var body: some View {
+        ZStack {
+            ForEach(1..<4) { ring in
+                DashboardRadarPolygon(values: Array(repeating: CGFloat(ring) / 3.0, count: 6), center: center, radius: radius)
+                    .stroke(Color.black.opacity(0.25), lineWidth: 1)
+            }
+
+            ForEach(0..<6, id: \.self) { index in
+                Path { path in
+                    let angle = CGFloat(-Double.pi / 2) + CGFloat(index) * (CGFloat(Double.pi * 2) / 6)
+                    let end = CGPoint(
+                        x: center.x + cos(angle) * radius,
+                        y: center.y + sin(angle) * radius
+                    )
+                    path.move(to: center)
+                    path.addLine(to: end)
+                }
+                .stroke(Color.black.opacity(0.2), lineWidth: 1)
+            }
+        }
+    }
+}
+
+private struct DashboardRadarPolygon: Shape {
+    let values: [CGFloat]
+    let center: CGPoint
+    let radius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard values.count == 6 else { return path }
+
+        for index in 0..<6 {
+            let angle = CGFloat(-Double.pi / 2) + CGFloat(index) * (CGFloat(Double.pi * 2) / 6)
+            let point = CGPoint(
+                x: center.x + cos(angle) * radius * values[index],
+                y: center.y + sin(angle) * radius * values[index]
+            )
+            if index == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
 struct BarChart: View {
     let usage: Int
     let maxUsage: Int
@@ -154,9 +283,10 @@ struct BarChart: View {
             let width = geo.size.width
             let usageWidth = width * CGFloat(usage) / CGFloat(maxUsage)
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.black.opacity(0.2))
-                Capsule().fill(Color.black.opacity(0.5))
+                Capsule().fill(Color(red: 0.89, green: 0.93, blue: 0.78))
+                Capsule().fill(FocusColors.barChartFill).stroke(Color(red: 0.7, green: 0.56, blue: 0.56))
                     .frame(width:((usage > maxUsage) ? width : usageWidth))
+                
             }
         }.frame(height: height)
     }
@@ -164,10 +294,10 @@ struct BarChart: View {
 struct BarChartRow: View {
     let categoryUsage: CategoryUsage
     var body: some View {
-        HStack(spacing: 16) {
-            Text(categoryUsage.id.title).font(.system(size:10)).frame(width: 60, alignment: .leading).padding(.leading, 13)
+        HStack(spacing: 0) {
+            Text(categoryUsage.id.title).font(.custom("Poppins", size:12)).frame(maxWidth: 100, alignment: .leading).foregroundStyle(getTextColor())
             BarChart(usage: categoryUsage.usage, maxUsage: categoryUsage.maxUsage, height: nil)
-            Text("\(formatSeconds(categoryUsage.usage))").frame(width: 60, alignment: .trailing).font(.system(size:10)).padding(.trailing, 13)
+            Text("\(formatSeconds(categoryUsage.usage))").frame(maxWidth: 100, alignment: .trailing).font(.custom("Poppins", size:12)).foregroundStyle(getTextColor())
             
         }.frame(height:11)
     }
@@ -187,25 +317,37 @@ struct GoalsView: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
         VStack {
-            Text("Goals").font(.system(size:32, weight:.medium)).frame(maxWidth: .infinity, alignment: .leading)
-            GoalsPill(usage: $usage).background(FocusColors.background).cornerRadius(30)
-        }.padding(13)
+            Text("Goals").font(.custom("SortsMillGoudy-Regular", size: 20)).frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .topLeading).foregroundStyle(getTextColor())
+            Text("You are \(usage.reduce(0) {$0 + $1.usage} <= usage.reduce(0) {$0 + $1.maxUsage} ? "" : "not")on track to meet today's goals!").font(.custom("Poppins", size:14)).multilineTextAlignment(.leading).frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(getTextColor())
+            SetGoalsButton(usage: $usage).padding(.horizontal, 70)
+        }.padding(.horizontal, 12)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .background(Color.white)
+            .cornerRadius(8)
+            .shadow(color: Color(red: 0.58, green: 0.63, blue: 0.34).opacity(0.25), radius: 2, x: 0, y: 3)
     }
 }
 
-struct GoalsPill: View {
+struct SetGoalsButton: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
-        VStack {
-            Text("You are \(usage.reduce(0) {$0 + $1.usage} <= usage.reduce(0) {$0 + $1.maxUsage} ? "" : "not")on track to meet today's goals!").font(.system(size:20, weight:.regular)).multilineTextAlignment(.leading).padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            NavigationLink {
-                MyGoalsView(usage: $usage)
-            } label: {
-                Text("View & Set Goals").font(.system(size: 20, weight:.medium)).frame(maxWidth: .infinity, alignment:.leading).padding(16).foregroundColor(.black)
-            }
-        }
+        NavigationLink {
+            MyGoalsView(usage: $usage)
+        } label: {
+            Text("Set Goals").font(.custom("SortsMillGoudy-Regular", size: 16)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment:.center).padding(.horizontal, 32)
+                .padding(.top, 4).foregroundColor(.black)
+        }.background(RoundedRectangle(cornerRadius:4).fill(FocusColors.setGoalsFill))
+            .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
+            .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
+            .overlay(
+            RoundedRectangle(cornerRadius: 4)
+            .inset(by: 0.5)
+            .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
+            )
     }
 }
+
 struct BackButton: View {
     @Environment(\.dismiss) private var dismiss
     var body: some View {
@@ -254,7 +396,7 @@ struct MyGoalsHeader: View {
 struct LimitGoals: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
-        Text("Limit").font(.system(size:32, weight:.medium)).frame(maxWidth: .infinity, alignment:.leading).padding(.leading, 13)
+        Text("Limit").font(.custom("SortsMillGoudy-Regular", size:32, )).frame(maxWidth: .infinity, alignment:.leading).padding(.leading, 13)
         ForEach(usage.filter {$0.type == .Limit}) {item in
             ProgressComponent(categoryUsage: item).padding(.horizontal, 30).padding(.vertical, 8)
         }
@@ -263,7 +405,7 @@ struct LimitGoals: View {
 struct PrioritizeGoals: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
-        Text("Prioritize").font(.system(size:32, weight:.medium)).frame(maxWidth: .infinity, alignment:.leading).padding(.leading, 13)
+        Text("Prioritize").font(.custom("SortsMillGoudy-Regular", size:32, )).frame(maxWidth: .infinity, alignment:.leading).padding(.leading, 13)
         ForEach(usage.filter {$0.type == .Prioritize}) {item in
             ProgressComponent(categoryUsage: item).padding(.horizontal, 30).padding(.vertical, 8)
         }
@@ -277,11 +419,13 @@ struct ProgressComponent: View {
     var body: some View {
         VStack {
             HStack {
-                Text("\(categoryUsage.id)").font(.system(size:24, weight: .regular)).frame(maxWidth:.infinity, alignment: .leading).padding(.leading ,13)
-                Text("\(minutesLeft) min left").font(.system(size:24, weight: .regular)).frame(maxWidth:.infinity, alignment: .trailing).padding(.trailing,13)
+                Text("\(categoryUsage.id)").font(.custom("Poppins", size:14)).frame(maxWidth:.infinity, alignment: .leading).padding(.leading ,13)
+                Text("\(minutesLeft) min left").font(.custom("Poppins", size:14)).frame(maxWidth:.infinity, alignment: .trailing).padding(.trailing,13)
             }
             BarChart(usage:categoryUsage.usage, maxUsage: categoryUsage.maxUsage, height: 30).padding(.horizontal,13)
-        }.frame(width: 343).frame(height:113).background(FocusColors.background).cornerRadius(20)
+        }.frame(width: 343).frame(height:113).background(
+            RoundedRectangle(cornerRadius:16).stroke(Color.black)
+        )
     }
 }
 
@@ -513,11 +657,68 @@ struct SaveButton: View {
             )
     }
 }
+
+enum TextColors {
+    static let awakeText = Color(red: 0.26, green: 0.36, blue: 0.2)
+    static let restText = Color(red: 0.32, green: 0.23, blue: 0.22)
+    static let streakGradientAwake = LinearGradient(
+        colors: [
+            Color(red: 0.94, green: 0.55, blue: 0.38),
+            Color(red: 0.96, green: 0.34, blue: 0.37)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    static let streakGradientRest = LinearGradient(
+        colors: [
+            Color(red: 0.91, green: 0.67, blue: 0.47),
+            Color(red: 0.78, green: 0.79, blue: 0.61),
+            Color(red: 0.61, green: 0.86, blue: 0.87)
+            
+        ],
+        startPoint: UnitPoint(x: 0.2, y: 0.1),
+        endPoint: UnitPoint(x: 0.8, y: 0.9)
+    )
+}
 enum FocusColors {
     static let background = Color(
         red: 217.0 / 255.0,
         green: 217.0 / 255.0,
         blue: 217.0 / 255.0
+    )
+
+    static let tempBackground = UIColor(red: 1, green: 0.98, blue: 0.84, alpha: 1)
+    static let insightBackground = LinearGradient(
+        colors: [
+            Color(red: 255/255, green: 231/255, blue: 239/255),
+            Color(red: 255/255, green: 253/255, blue: 236/255)
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+    )
+    static let goalsButtonBackground = Color(
+        red: 255/255,
+        green: 253/255,
+        blue: 236/255
+    )
+
+    static let barChartFill = LinearGradient(
+        colors: [
+            Color(red: 0.89, green: 0.86, blue: 0.58),
+            Color(red: 0.96, green: 0.77, blue: 0.5),
+            Color(red: 0.96, green: 0.89, blue: 0.87)
+        ],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+    static let setGoalsFill = LinearGradient(
+        colors: [
+            Color(red: 0.96, green: 0.89, blue: 0.87),
+            Color(red: 0.96, green: 0.77, blue: 0.5),
+            Color(red: 0.89, green: 0.86, blue: 0.58)
+        ],
+        startPoint: .leading,
+        endPoint: .trailing
     )
     static let darkerBackground = Color (
         red: 96.0 / 255.0,
@@ -570,6 +771,46 @@ let mockUsage: [CategoryUsage] = [
     .init(id: .creativity, usage: 3600, maxUsage: 7200, type: .Limit),
     .init(id: .productivity, usage: 1800, maxUsage: 7200, type: .Prioritize)
 ]
+let banner: [BannerItem] = [
+    .init(imageName:"Illustration294 1"),
+    .init(imageName:"Illustration295 1"),
+    .init(imageName:"Illustration296 1"),
+    .init(imageName:"Illustration297 1"),
+    .init(imageName:"Illustration298 1"),
+    .init(imageName:"Illustration299 1"),
+    .init(imageName:"Illustration300 1"),
+    .init(imageName:"Illustration301 1"),
+    .init(imageName:"Illustration302 1")
+]
+private func getTextColor () -> Color {
+    let hour = Calendar.current.component(.hour, from: Date())
+    
+    if( hour >= 12 && hour <= 24) {
+        return TextColors.awakeText;
+    } else {
+        return TextColors.restText;
+    }
+}
+private func getStreakNumColor () -> LinearGradient {
+    let hour = Calendar.current.component(.hour, from: Date())
+    
+    if( hour >= 12 && hour <= 24) {
+        return TextColors.streakGradientAwake;
+    } else {
+        return TextColors.streakGradientRest;
+    }
+}
+private func getTimeOfDayText() -> String {
+    let hour = Calendar.current.component(.hour, from: Date())
+    
+    if( hour >= 6 && hour <= 11) {
+        return "this morning"
+    } else if( hour >= 11 && hour <= 17 ) {
+        return "this afternoon"
+    } else {
+        return "tonight"
+    }
+}
 #Preview {
     FocusView()
 
