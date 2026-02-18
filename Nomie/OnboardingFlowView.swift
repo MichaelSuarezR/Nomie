@@ -26,6 +26,10 @@ struct OnboardingFlowView: View {
         ZStack {
             if pageIndex == 0 {
                 OnboardingWelcomeBackground(style: backgroundStyle)
+            } else if pageIndex == 2 {
+                OnboardingWelcomeBackground(style: .goals)
+            } else if pageIndex == 3 {
+                OnboardingWelcomeBackground(style: .tracking)
             } else {
                 Color.white.ignoresSafeArea()
             }
@@ -46,6 +50,7 @@ struct OnboardingFlowView: View {
                     OnboardingWelcomeView(
                         isAuthSheetVisible: isAuthSheetVisible,
                         onSignUp: {
+                            appState.resetOnboarding()
                             withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
                                 showSignUpSheet = true
                             }
@@ -62,7 +67,7 @@ struct OnboardingFlowView: View {
                 case 2:
                     OnboardingGoalsView(selectedGoals: $selectedGoals)
                 default:
-                    OnboardingCheckInView()
+                    OnboardingTrackingView()
                 }
             }
 
@@ -108,6 +113,7 @@ struct OnboardingFlowView: View {
                         onSignUp: {
                             withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
                                 showLoginSheet = false
+                                appState.resetOnboarding()
                                 showSignUpSheet = true
                             }
                         }
@@ -133,6 +139,12 @@ struct OnboardingFlowView: View {
                             withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
                                 showSignUpSheet = false
                                 showLoginSheet = true
+                            }
+                        },
+                        onSuccess: {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+                                showSignUpSheet = false
+                                pageIndex = 2
                             }
                         }
                     )
@@ -219,11 +231,11 @@ private struct OnboardingPageIndicator: View {
     let total: Int
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
             ForEach(0..<total, id: \.self) { index in
                 Capsule()
-                    .fill(index == currentIndex ? Color.black : Color.gray.opacity(0.3))
-                    .frame(width: index == currentIndex ? 28 : 18, height: 6)
+                    .fill(index == currentIndex ? Color.black.opacity(0.65) : Color.black.opacity(0.25))
+                    .frame(width: index == currentIndex ? 30 : 22, height: 3)
             }
         }
     }
@@ -319,6 +331,8 @@ private struct OnboardingWelcomeBackground: View {
         case welcome
         case login
         case signup
+        case goals
+        case tracking
     }
 
     let style: Style
@@ -345,6 +359,26 @@ private struct OnboardingWelcomeBackground: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
+            } else if style == .goals {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.96, green: 0.80, blue: 0.70),
+                        Color(red: 0.80, green: 0.84, blue: 0.70),
+                        Color(red: 0.52, green: 0.80, blue: 0.78)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else if style == .tracking {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.96, green: 0.78, blue: 0.62),
+                        Color(red: 0.95, green: 0.70, blue: 0.62),
+                        Color(red: 0.92, green: 0.60, blue: 0.58)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             } else {
                 LinearGradient(
                     colors: [
@@ -363,16 +397,28 @@ private struct OnboardingWelcomeBackground: View {
                     ? Color(red: 0.94, green: 0.54, blue: 0.64).opacity(0.95)
                     : (style == .login
                        ? Color(red: 0.62, green: 0.86, blue: 0.85).opacity(0.95)
+                       : style == .goals
+                       ? Color(red: 0.70, green: 0.86, blue: 0.80).opacity(0.92)
+                       : style == .tracking
+                       ? Color(red: 0.98, green: 0.82, blue: 0.66).opacity(0.92)
                        : Color(red: 0.99, green: 0.84, blue: 0.72).opacity(0.92)),
                     style == .welcome
                     ? Color(red: 0.97, green: 0.74, blue: 0.66).opacity(0.9)
                     : (style == .login
                        ? Color(red: 0.84, green: 0.88, blue: 0.74).opacity(0.9)
+                       : style == .goals
+                       ? Color(red: 0.86, green: 0.84, blue: 0.62).opacity(0.88)
+                       : style == .tracking
+                       ? Color(red: 0.98, green: 0.70, blue: 0.56).opacity(0.88)
                        : Color(red: 0.96, green: 0.70, blue: 0.58).opacity(0.88)),
                     style == .welcome
                     ? Color(red: 0.99, green: 0.92, blue: 0.78).opacity(0.9)
                     : (style == .login
                        ? Color(red: 0.94, green: 0.78, blue: 0.62).opacity(0.88)
+                       : style == .goals
+                       ? Color(red: 0.52, green: 0.80, blue: 0.78).opacity(0.9)
+                       : style == .tracking
+                       ? Color(red: 0.98, green: 0.60, blue: 0.56).opacity(0.9)
                        : Color(red: 0.94, green: 0.52, blue: 0.52).opacity(0.9))
                 ],
                 center: UnitPoint(x: 0.78, y: 0.45),
@@ -411,21 +457,6 @@ private struct LoginSheetView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 18) {
-                HStack {
-                    Button(action: onClose) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.black.opacity(0.6))
-                            .padding(8)
-                            .background(Color.black.opacity(0.06))
-                            .clipShape(Circle())
-                    }
-
-                    Spacer()
-                }
-                .padding(.top, 12)
-                .padding(.leading, 12)
-
                 Capsule()
                     .fill(Color.black.opacity(0.12))
                     .frame(width: 48, height: 6)
@@ -541,13 +572,13 @@ private struct LoginSheetView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
-        .frame(maxHeight: 540)
+        .frame(maxHeight: 620)
         .frame(maxWidth: .infinity)
         .background(Color(red: 0.99, green: 0.98, blue: 0.96))
         .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
         .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: -8)
         .padding(.horizontal, 16)
-        .padding(.bottom, 8 + keyboardHeight)
+        .padding(.bottom, 20 + keyboardHeight)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .animation(.easeOut(duration: 0.25), value: keyboardHeight)
         .onAppear { keyboardHeight = 0 }
@@ -585,6 +616,7 @@ private struct LoginSheetView: View {
 private struct SignUpSheetView: View {
     let onClose: () -> Void
     let onLogIn: () -> Void
+    let onSuccess: () -> Void
 
     @State private var firstName = ""
     @State private var lastName = ""
@@ -600,21 +632,6 @@ private struct SignUpSheetView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 18) {
-                HStack {
-                    Button(action: onClose) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.black.opacity(0.6))
-                            .padding(8)
-                            .background(Color.black.opacity(0.06))
-                            .clipShape(Circle())
-                    }
-
-                    Spacer()
-                }
-                .padding(.top, 12)
-                .padding(.leading, 12)
-
                 Capsule()
                     .fill(Color.black.opacity(0.12))
                     .frame(width: 48, height: 6)
@@ -751,13 +768,13 @@ private struct SignUpSheetView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
-        .frame(maxHeight: 600)
+        .frame(maxHeight: 680)
         .frame(maxWidth: .infinity)
         .background(Color(red: 0.99, green: 0.98, blue: 0.96))
         .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
         .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: -8)
         .padding(.horizontal, 16)
-        .padding(.bottom, 8 + keyboardHeight)
+        .padding(.bottom, 20 + keyboardHeight)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .animation(.easeOut(duration: 0.25), value: keyboardHeight)
         .onAppear { keyboardHeight = 0 }
@@ -814,6 +831,10 @@ private struct SignUpSheetView: View {
                     .from("profiles")
                     .insert(profile)
                     .execute()
+
+                await MainActor.run {
+                    onSuccess()
+                }
             } catch {
                 message = error.localizedDescription
             }
@@ -967,9 +988,13 @@ private struct OnboardingGoalsView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 28) {
-            Text("What are\nyour goals?")
-                .font(.system(size: 36, weight: .bold))
+        VStack(spacing: 24) {
+            Spacer()
+
+            Text("What are your goals?")
+                .font(.system(size: 32, weight: .regular, design: .serif))
+                .italic()
+                .foregroundColor(Color.black.opacity(0.75))
                 .multilineTextAlignment(.center)
 
             VStack(spacing: 14) {
@@ -979,11 +1004,11 @@ private struct OnboardingGoalsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 40)
 
             Spacer()
         }
-        .padding(.top, 36)
+        .padding(.top, 40)
     }
 
     private func toggle(_ goal: String) {
@@ -1003,32 +1028,77 @@ private struct GoalButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.headline)
+                .font(.system(size: 17, weight: .regular, design: .serif))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(isSelected ? Color.black : Color.gray.opacity(0.2))
-                .foregroundColor(isSelected ? .white : .black)
+                .padding(.vertical, 12)
+                .background(Color.white.opacity(isSelected ? 0.95 : 0.85))
+                .foregroundColor(Color.black.opacity(0.75))
+                .overlay(
+                    Capsule().stroke(Color.black.opacity(0.45), lineWidth: 1)
+                )
                 .clipShape(Capsule())
         }
     }
 }
 
-private struct OnboardingCheckInView: View {
+private struct OnboardingTrackingView: View {
+    @State private var selections: [String: Bool] = [
+        "Category 1": true,
+        "Lorem Ipsum": true,
+        "Lorem Ipsum 2": true,
+        "Lorem Ipsum 3": true
+    ]
+
     var body: some View {
         VStack(spacing: 24) {
-            Text("Daily check-in")
-                .font(.system(size: 34, weight: .bold))
+            Spacer()
+
+            Text("Allow us to track?")
+                .font(.system(size: 32, weight: .regular, design: .serif))
+                .italic()
+                .foregroundColor(Color.black.opacity(0.75))
                 .multilineTextAlignment(.center)
 
-            Text("Track your mood and screen-time patterns in under a minute.")
-                .font(.title3)
-                .foregroundColor(.black.opacity(0.7))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 28)
+            VStack(spacing: 14) {
+                ForEach(selections.keys.sorted(), id: \.self) { key in
+                    TrackingRow(
+                        title: key,
+                        isOn: Binding(
+                            get: { selections[key] ?? false },
+                            set: { selections[key] = $0 }
+                        )
+                    )
+                }
+            }
+            .padding(.horizontal, 40)
 
             Spacer()
         }
-        .padding(.top, 48)
+        .padding(.top, 40)
+    }
+}
+
+private struct TrackingRow: View {
+    let title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(size: 17, weight: .regular, design: .serif))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.white.opacity(0.9))
+                .foregroundColor(Color.black.opacity(0.75))
+                .overlay(
+                    Capsule().stroke(Color.black.opacity(0.45), lineWidth: 1)
+                )
+                .clipShape(Capsule())
+
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(Color(red: 0.62, green: 0.90, blue: 0.76))
+        }
     }
 }
 

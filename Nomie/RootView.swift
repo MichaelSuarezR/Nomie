@@ -12,7 +12,7 @@ struct RootView: View {
         Group {
             if appState.session == nil {
                 OnboardingFlowView()
-            } else if !appState.hasCompletedOnboarding {
+            } else if appState.requiresOnboarding || !appState.hasCompletedOnboarding {
                 OnboardingFlowView()
             } else {
                 ContentView()

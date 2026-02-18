@@ -11,20 +11,32 @@ import Combine
 final class AppState: ObservableObject {
     @Published var session: Session?
     @Published var hasCompletedOnboarding: Bool
+    @Published var requiresOnboarding: Bool
 
     private let onboardingKey = "hasCompletedOnboarding"
+    private let onboardingRequiredKey = "requiresOnboarding"
     private let supabase = SupabaseManager.shared
     private var authTask: Task<Void, Never>?
 
     init() {
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
+        self.requiresOnboarding = UserDefaults.standard.bool(forKey: onboardingRequiredKey)
         self.session = nil
         startAuthListener()
     }
 
     func completeOnboarding() {
         hasCompletedOnboarding = true
+        requiresOnboarding = false
         UserDefaults.standard.set(true, forKey: onboardingKey)
+        UserDefaults.standard.set(false, forKey: onboardingRequiredKey)
+    }
+
+    func resetOnboarding() {
+        hasCompletedOnboarding = false
+        requiresOnboarding = true
+        UserDefaults.standard.set(false, forKey: onboardingKey)
+        UserDefaults.standard.set(true, forKey: onboardingRequiredKey)
     }
 
     func signOut() async {
