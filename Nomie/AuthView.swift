@@ -8,6 +8,7 @@ import Supabase
 
 struct AuthView: View {
     @EnvironmentObject private var appState: AppState
+    @AppStorage("usesMockAccount") private var usesMockAccount = false
 
     enum Mode {
         case signUp
@@ -20,6 +21,7 @@ struct AuthView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @State private var useMockAccount = false
     @State private var isLoading = false
     @State private var message: String?
 
@@ -47,6 +49,7 @@ struct AuthView: View {
                         email: $email,
                         password: $password,
                         confirmPassword: $confirmPassword,
+                        useMockAccount: $useMockAccount,
                         isLoading: isLoading,
                         message: message,
                         canSubmit: canSubmit,
@@ -161,6 +164,7 @@ struct AuthView: View {
 
                     await MainActor.run {
                         appState.resetOnboarding()
+                        usesMockAccount = useMockAccount
                     }
                 } else {
                     try await supabase.auth.signIn(email: email, password: password)
@@ -234,6 +238,7 @@ private struct SignUpCard: View {
     @Binding var email: String
     @Binding var password: String
     @Binding var confirmPassword: String
+    @Binding var useMockAccount: Bool
     let isLoading: Bool
     let message: String?
     let canSubmit: Bool
@@ -328,6 +333,18 @@ private struct SignUpCard: View {
                                 .stroke(Color.black.opacity(0.25), lineWidth: 1)
                         )
                 }
+            }
+            .padding(.horizontal, 30)
+
+            Button(action: { useMockAccount.toggle() }) {
+                HStack(spacing: 8) {
+                    Image(systemName: useMockAccount ? "checkmark.square.fill" : "square")
+                        .foregroundColor(.black.opacity(0.7))
+                    Text("Mock account")
+                        .font(.system(size: 14))
+                        .foregroundColor(.black.opacity(0.75))
+                }
+                Spacer()
             }
             .padding(.horizontal, 30)
 

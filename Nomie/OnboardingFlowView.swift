@@ -6,6 +6,8 @@
 import SwiftUI
 import Supabase
 import UIKit
+import FamilyControls
+import ManagedSettings
 
 struct OnboardingFlowView: View {
     @EnvironmentObject private var appState: AppState
@@ -14,7 +16,9 @@ struct OnboardingFlowView: View {
     @State private var authMode: AuthView.Mode = .signUp
     @State private var showLoginSheet = false
     @State private var showSignUpSheet = false
-    private let totalPages = 4
+    @StateObject private var screenTimeModel = ScreenTimeModel()
+    @AppStorage("usesMockAccount") private var usesMockAccount = false
+    private let totalPages = 5
 
     var body: some View {
         let isAuthed = appState.session != nil
@@ -26,9 +30,9 @@ struct OnboardingFlowView: View {
         ZStack {
             if pageIndex == 0 {
                 OnboardingWelcomeBackground(style: backgroundStyle)
-            } else if pageIndex == 2 {
-                OnboardingWelcomeBackground(style: .goals)
             } else if pageIndex == 3 {
+                OnboardingWelcomeBackground(style: .goals)
+            } else if pageIndex == 4 {
                 OnboardingWelcomeBackground(style: .tracking)
             } else {
                 Color.white.ignoresSafeArea()
@@ -60,6 +64,8 @@ struct OnboardingFlowView: View {
                     AuthView(initialMode: authMode)
                         .id(authMode)
                 case 2:
+                    ScreenTimeSetupView(model: screenTimeModel)
+                case 3:
                     OnboardingGoalsView(selectedGoals: $selectedGoals)
                 default:
                     OnboardingTrackingView()
@@ -86,6 +92,8 @@ struct OnboardingFlowView: View {
                         .foregroundColor(.white)
                         .clipShape(Capsule())
                 }
+                .disabled(!canAdvance)
+                .opacity(canAdvance ? 1 : 0.5)
                 .padding(.horizontal, 28)
                 .padding(.bottom, 28)
             } else {
@@ -136,11 +144,12 @@ struct OnboardingFlowView: View {
                                 showLoginSheet = true
                             }
                         },
-                        onSuccess: {
+                        onSuccess: { isMock in
                             withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
                                 appState.resetOnboarding()
+                                usesMockAccount = isMock
                                 showSignUpSheet = false
-                                pageIndex = 2
+                                pageIndex = isMock ? 3 : 2
                             }
                         }
                     )
@@ -159,9 +168,9 @@ struct OnboardingFlowView: View {
                 if showLoginSheet || showSignUpSheet {
                     showLoginSheet = false
                     showSignUpSheet = false
-                    pageIndex = 2
+                    pageIndex = usesMockAccount ? 3 : 2
                 } else if pageIndex == 1 {
-                    pageIndex = 2
+                    pageIndex = usesMockAccount ? 3 : 2
                 }
             }
         }
@@ -183,6 +192,13 @@ struct OnboardingFlowView: View {
             saveGoals()
             completeOnboarding()
         }
+    }
+
+    private var canAdvance: Bool {
+        if pageIndex == 2 {
+            return screenTimeModel.hasSelection
+        }
+        return true
     }
 
     private func saveGoals() {
@@ -517,6 +533,18 @@ private struct LoginSheetView: View {
                 }
                 .padding(.horizontal, 30)
 
+                Button(action: { useMockAccount.toggle() }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: useMockAccount ? "checkmark.square.fill" : "square")
+                            .foregroundColor(.black.opacity(0.7))
+                        Text("Mock account")
+                            .font(.system(size: 14))
+                            .foregroundColor(.black.opacity(0.75))
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 30)
+
                 if let message {
                     Text(message)
                         .font(.subheadline)
@@ -605,13 +633,14 @@ private struct LoginSheetView: View {
 private struct SignUpSheetView: View {
     let onClose: () -> Void
     let onLogIn: () -> Void
-    let onSuccess: () -> Void
+    let onSuccess: (Bool) -> Void
 
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @State private var useMockAccount = false
     @State private var isLoading = false
     @State private var message: String?
     @State private var keyboardHeight: CGFloat = 0
@@ -833,7 +862,7 @@ private struct SignUpSheetView: View {
                     .execute()
 
                 await MainActor.run {
-                    onSuccess()
+                    onSuccess(useMockAccount)
                 }
             } catch {
                 message = error.localizedDescription
@@ -857,6 +886,134 @@ private struct OnboardingProfileInsert: Encodable {
     let email: String
     let first_name: String
     let last_name: String
+}
+
+@MainActor
+final class ScreenTimeModel: ObservableObject {
+    @Published var selection = FamilyActivitySelection()
+    @Published private(set) var isAuthorized = false
+
+    private let store = ManagedSettingsStore()
+    private let selectionKey = "screenTimeSelection"
+
+    init() {
+        loadSelection()
+        isAuthorized = AuthorizationCenter.shared.authorizationStatus == .approved
+        applySelection()
+    }
+
+    var hasSelection: Bool {
+        !(selection.applicationTokens.isEmpty && selection.categoryTokens.isEmpty)
+    }
+
+    func requestAuthorization() async {
+        do {
+            try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+            isAuthorized = AuthorizationCenter.shared.authorizationStatus == .approved
+        } catch {
+            isAuthorized = AuthorizationCenter.shared.authorizationStatus == .approved
+        }
+    }
+
+    func applySelection() {
+        guard isAuthorized else { return }
+        store.shield.applications = selection.applicationTokens
+        store.shield.applicationCategories = selection.categoryTokens
+        saveSelection()
+    }
+
+    private func saveSelection() {
+        if let data = try? JSONEncoder().encode(selection) {
+            UserDefaults.standard.set(data, forKey: selectionKey)
+        }
+    }
+
+    private func loadSelection() {
+        guard let data = UserDefaults.standard.data(forKey: selectionKey),
+              let saved = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data) else {
+            return
+        }
+        selection = saved
+    }
+}
+
+private struct ScreenTimeSetupView: View {
+    @ObservedObject var model: ScreenTimeModel
+    @State private var showingPicker = false
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer(minLength: 24)
+
+            VStack(spacing: 8) {
+                Text("Set your focus")
+                    .font(.system(size: 28, weight: .regular, design: .serif))
+                    .italic()
+                    .foregroundColor(Color.black.opacity(0.8))
+                Text("Choose apps to limit during your zine time.")
+                    .font(.system(size: 16, weight: .regular, design: .serif))
+                    .foregroundColor(Color.black.opacity(0.65))
+            }
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 32)
+
+            if model.isAuthorized {
+                Button(action: { showingPicker = true }) {
+                    Text(model.hasSelection ? "Edit Selection" : "Choose Apps")
+                        .font(.system(size: 18, weight: .medium, design: .serif))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.white.opacity(0.8))
+                        .foregroundColor(Color.black.opacity(0.8))
+                        .overlay(
+                            Capsule().stroke(Color.black.opacity(0.35), lineWidth: 1)
+                        )
+                        .clipShape(Capsule())
+                }
+                .padding(.horizontal, 28)
+
+                if model.hasSelection {
+                    Text("Selection saved. You can change this anytime.")
+                        .font(.system(size: 14))
+                        .foregroundColor(.black.opacity(0.6))
+                } else {
+                    Text("Pick at least one app or category to continue.")
+                        .font(.system(size: 14))
+                        .foregroundColor(.black.opacity(0.6))
+                }
+            } else {
+                Button(action: {
+                    Task {
+                        await model.requestAuthorization()
+                    }
+                }) {
+                    Text("Enable Screen Time")
+                        .font(.system(size: 18, weight: .medium, design: .serif))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.black)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
+                .padding(.horizontal, 28)
+
+                Text("We’ll ask permission to access Screen Time.")
+                    .font(.system(size: 14))
+                    .foregroundColor(.black.opacity(0.6))
+            }
+
+            Spacer()
+        }
+        .familyActivityPicker(isPresented: $showingPicker, selection: $model.selection)
+        .onChange(of: model.selection) { _ in
+            model.applySelection()
+        }
+        .onAppear {
+            if model.isAuthorized {
+                model.applySelection()
+            }
+        }
+    }
 }
 
 
