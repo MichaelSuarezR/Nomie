@@ -7,6 +7,8 @@ import SwiftUI
 import Supabase
 
 struct AuthView: View {
+    @EnvironmentObject private var appState: AppState
+
     enum Mode {
         case signUp
         case logIn
@@ -156,6 +158,10 @@ struct AuthView: View {
                         .from("profiles")
                         .insert(profile)
                         .execute()
+
+                    await MainActor.run {
+                        appState.resetOnboarding()
+                    }
                 } else {
                     try await supabase.auth.signIn(email: email, password: password)
                 }

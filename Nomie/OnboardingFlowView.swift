@@ -35,14 +35,9 @@ struct OnboardingFlowView: View {
             }
 
             VStack(spacing: 0) {
-            OnboardingTopBar(
-                canGoBack: pageIndex > 0,
-                showsSkip: isAuthed && pageIndex > 1,
-                onBack: { pageIndex = max(0, pageIndex - 1) },
-                onSkip: completeOnboarding
-            )
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
+                OnboardingTopBar()
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
 
             Group {
                 switch pageIndex {
@@ -143,6 +138,7 @@ struct OnboardingFlowView: View {
                         },
                         onSuccess: {
                             withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+                                appState.resetOnboarding()
                                 showSignUpSheet = false
                                 pageIndex = 2
                             }
@@ -201,27 +197,9 @@ struct OnboardingFlowView: View {
 }
 
 private struct OnboardingTopBar: View {
-    let canGoBack: Bool
-    let showsSkip: Bool
-    let onBack: () -> Void
-    let onSkip: () -> Void
-
     var body: some View {
         HStack {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.headline)
-                    .foregroundColor(canGoBack ? .black : .clear)
-            }
-            .disabled(!canGoBack)
-
             Spacer()
-
-            if showsSkip {
-                Button("Skip", action: onSkip)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
         }
     }
 }
@@ -457,9 +435,19 @@ private struct LoginSheetView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 18) {
-                Capsule()
-                    .fill(Color.black.opacity(0.12))
-                    .frame(width: 48, height: 6)
+                HStack {
+                    Button(action: onClose) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(.black.opacity(0.7))
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 30)
 
                 VStack(spacing: 8) {
                     Text("Welcome Back")
@@ -570,6 +558,7 @@ private struct LoginSheetView: View {
                 .font(.system(size: 14))
                 .padding(.bottom, 22)
             }
+            .padding(.top, 52)
         }
         .scrollDismissesKeyboard(.interactively)
         .frame(maxHeight: 620)
@@ -632,9 +621,19 @@ private struct SignUpSheetView: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 18) {
-                Capsule()
-                    .fill(Color.black.opacity(0.12))
-                    .frame(width: 48, height: 6)
+                HStack {
+                    Button(action: onClose) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(.black.opacity(0.7))
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 30)
 
                 VStack(spacing: 6) {
                     Text("Create your account")
@@ -766,6 +765,7 @@ private struct SignUpSheetView: View {
                 .font(.system(size: 14))
                 .padding(.bottom, 22)
             }
+            .padding(.top, 40)
         }
         .scrollDismissesKeyboard(.interactively)
         .frame(maxHeight: 680)
