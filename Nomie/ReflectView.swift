@@ -6,6 +6,8 @@
 import SwiftUI
 import UIKit
 
+private let reflectLandingMoodCardHeight: CGFloat = 228
+
 struct ReflectView: View {
     @State private var loggedMoods: [ReflectDateKey: ReflectMoodOption] = [:]
     @State private var journalPrompt = ReflectJournalPrompt.randomPrompt()
@@ -24,6 +26,28 @@ struct ReflectView: View {
         return moodForDate(yesterday)
     }
 
+    private var moodStreakDays: Int {
+        var streak = 0
+        var probeDate = calendar.startOfDay(for: Date())
+
+        while true {
+            let key = ReflectDateKey(date: probeDate, calendar: calendar)
+            guard loggedMoods[key] != nil else { break }
+            streak += 1
+            guard let previousDate = calendar.date(byAdding: .day, value: -1, to: probeDate) else { break }
+            probeDate = previousDate
+        }
+
+        return streak
+    }
+
+    private func yesterdayReflectionPrompt(for mood: ReflectMoodOption) -> String {
+        let moodName = mood.name.lowercased()
+        return """
+        What made you \(moodName) yesterday? What are some ways you expressed and felt your \(moodName)? How does this relate to your goals and productivity yesterday?
+        """
+    }
+
     private var journalDateLabel: String {
         ReflectJournalPrompt.dateLabel(Date())
     }
@@ -31,28 +55,42 @@ struct ReflectView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    ReflectHeader(title: "Reflect")
+                VStack(spacing: 20) {
+                    ReflectHeader()
 
-                    ReflectHero(
-                        title: "Daily check-in",
-                        subtitle: "How are you feeling lately?",
-                        accentColor: accentColor
-                    )
+                    ReflectLandingTabs()
 
                     ReflectSectionTitle(text: "Daily Mood")
-                    HStack(spacing: 16) {
+                    HStack(alignment: .top, spacing: 14) {
                         NavigationLink {
                             DailyMoodView(loggedMoods: $loggedMoods)
                         } label: {
-                            ReflectSoftCard {
-                                ReflectMoodCard(title: "Today's mood:", mood: todayMood, isActionable: true)
-                            }
+                            ReflectTodayMoodCard(mood: todayMood)
                         }
                         .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
 
-                        ReflectSoftCard {
-                            ReflectMoodCard(title: "Yesterday's mood:", mood: yesterdayMood, isActionable: false)
+                        ReflectStreakCard(days: moodStreakDays)
+                            .frame(maxWidth: .infinity)
+                    }
+
+                    if let yesterdayMood {
+                        HStack(alignment: .top, spacing: 16) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Reflect on yesterday:")
+                                    .font(.custom("SortsMillGoudy-Italic", size: 22))
+                                    .foregroundStyle(inkColor.opacity(0.92))
+
+                                Text(yesterdayReflectionPrompt(for: yesterdayMood))
+                                    .font(.custom("Poppins-Regular", size: 14))
+                                    .foregroundStyle(inkColor.opacity(0.88))
+                                    .lineSpacing(2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            ReflectYesterdayMoodSummary(mood: yesterdayMood)
+                                .frame(width: 128)
                         }
                     }
 
@@ -161,12 +199,13 @@ struct ReflectView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
+                .padding(.top, 8)
             }
             .background(
                 LinearGradient(
                     colors: [
+                        Color(red: 0.94, green: 0.94, blue: 0.93),
                         surfaceColor,
-                        Color(red: 0.98, green: 0.98, blue: 0.965),
                         tabBarColor
                     ],
                     startPoint: .topLeading,
@@ -193,19 +232,27 @@ struct ReflectView: View {
 }
 
 struct ReflectHeader: View {
-    let title: String
-
     var body: some View {
-        HStack(spacing: 12) {
-            Color.clear.frame(width: 36, height: 36)
-            Spacer()
-            Text(title)
-                .font(.custom("Georgia", size: 34))
-                .foregroundStyle(Color.black.opacity(0.86))
-            Spacer()
-            Color.clear.frame(width: 36, height: 36)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 0) {
+                Image("R")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 72, height: 80)
+
+                Image("eflect")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 36)
+                    .padding(.leading, -10)
+                    .padding(.bottom, 12)
+            }
+
+            Rectangle()
+                .fill(Color.black.opacity(0.35))
+                .frame(height: 1)
         }
-        .padding(.top, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -213,11 +260,191 @@ struct ReflectSectionTitle: View {
     let text: String
 
     var body: some View {
-        Text(text)
-            .font(.custom("Georgia", size: 22))
-            .foregroundStyle(Color.black.opacity(0.82))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 2)
+        HStack(spacing: 10) {
+            Text(text)
+                .font(.custom("SortsMillGoudy-Regular", size: 24))
+                .foregroundStyle(Color.black.opacity(0.88))
+                .fixedSize()
+            Rectangle()
+                .fill(Color.black.opacity(0.35))
+                .frame(height: 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct ReflectLandingTabs: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            ReflectLandingTabChip(title: "Daily Mood", isSelected: true)
+            ReflectLandingTabChip(title: "Self-Journal", isSelected: false)
+            ReflectLandingTabChip(title: "Patterns & Trends", isSelected: false)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct ReflectLandingTabChip: View {
+    let title: String
+    let isSelected: Bool
+
+    var body: some View {
+        Text(title)
+            .font(.custom("Poppins-Regular", size: 12))
+            .foregroundStyle(Color.black.opacity(0.84))
+            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isSelected ? Color.white.opacity(0.96) : Color.white.opacity(0.72))
+                    .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+    }
+}
+
+struct ReflectTodayMoodCard: View {
+    let mood: ReflectMoodOption?
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Today's Mood:")
+                .font(.custom("SortsMillGoudy-Italic", size: 20))
+                .foregroundStyle(Color.black.opacity(0.85))
+
+            if let mood {
+                MoodAssetImage(
+                    assetName: mood.assetName,
+                    intensity: 0.85
+                )
+                .frame(width: 102, height: 102)
+            } else {
+                Circle()
+                    .stroke(
+                        Color.black.opacity(0.65),
+                        style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])
+                    )
+                    .frame(width: 102, height: 102)
+            }
+
+            Text("Daily Mood")
+                .font(.custom("Poppins-Regular", size: 13))
+                .foregroundStyle(Color.black.opacity(0.82))
+                .padding(.vertical, 7)
+                .padding(.horizontal, 20)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.9))
+                        .shadow(color: Color.black.opacity(0.12), radius: 5, x: 0, y: 3)
+                )
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 10)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: reflectLandingMoodCardHeight,
+            maxHeight: reflectLandingMoodCardHeight,
+            alignment: .top
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.93, green: 0.9, blue: 0.58),
+                            Color(red: 0.97, green: 0.6, blue: 0.71),
+                            Color(red: 0.95, green: 0.86, blue: 0.63)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 5)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.45), lineWidth: 1)
+        )
+    }
+}
+
+struct ReflectStreakCard: View {
+    let days: Int
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image("Streak")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 18)
+
+                Text("Streak")
+                    .font(.custom("SortsMillGoudy-Regular", size: 32))
+                    .foregroundStyle(Color.black.opacity(0.9))
+            }
+
+            Text("\(days)")
+                .font(.custom("BricolageGrotesque-96ptExtraBold_Regular", size: 62))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.97, green: 0.63, blue: 0.35),
+                            Color(red: 0.88, green: 0.68, blue: 0.31)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            Text("Days")
+                .font(.custom("Poppins-Regular", size: 16))
+                .foregroundStyle(Color.black.opacity(0.9))
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 12)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: reflectLandingMoodCardHeight,
+            maxHeight: reflectLandingMoodCardHeight,
+            alignment: .top
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.92))
+                .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 5)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+}
+
+struct ReflectYesterdayMoodSummary: View {
+    let mood: ReflectMoodOption
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Text("Yesterday's mood:")
+                .font(.custom("SortsMillGoudy-Italic", size: 20))
+                .foregroundStyle(Color.black.opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            MoodAssetImage(assetName: mood.assetName, intensity: 0.85)
+                .frame(width: 106, height: 106)
+
+            Text(mood.name)
+                .font(.custom("Poppins-Regular", size: 16))
+                .foregroundStyle(Color.black.opacity(0.88))
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 }
 
