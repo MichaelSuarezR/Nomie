@@ -39,7 +39,10 @@ struct OnboardingFlowView: View {
             }
 
             VStack(spacing: 0) {
-                OnboardingTopBar()
+                OnboardingTopBar(
+                    showSkip: pageIndex == 0 && !isAuthSheetVisible,
+                    onSkip: skipWelcome
+                )
                 .padding(.horizontal, 24)
                 .padding(.top, 12)
 
@@ -64,7 +67,10 @@ struct OnboardingFlowView: View {
                     AuthView(initialMode: authMode)
                         .id(authMode)
                 case 2:
-                    ScreenTimeSetupView(model: screenTimeModel)
+                    ScreenTimeSetupView(
+                        model: screenTimeModel,
+                        onSkipSetup: completeOnboarding
+                    )
                 case 3:
                     OnboardingGoalsView(selectedGoals: $selectedGoals)
                 default:
@@ -194,12 +200,17 @@ struct OnboardingFlowView: View {
         }
     }
 
-    private var canAdvance: Bool {
-        if pageIndex == 2 {
-            return screenTimeModel.hasSelection
+    private func skipWelcome() {
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.9)) {
+            if appState.session == nil {
+                pageIndex = 1
+            } else {
+                pageIndex = usesMockAccount ? 3 : 2
+            }
         }
-        return true
     }
+
+    private var canAdvance: Bool { true }
 
     private func saveGoals() {
         let goals = Array(selectedGoals)
@@ -213,10 +224,22 @@ struct OnboardingFlowView: View {
 }
 
 private struct OnboardingTopBar: View {
+    let showSkip: Bool
+    let onSkip: () -> Void
+
     var body: some View {
         HStack {
-            Spacer()
+            if showSkip {
+                Spacer()
+                Button("Skip", action: onSkip)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.black.opacity(0.7))
+            } else {
+                Spacer()
+            }
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 24)
     }
 }
 
@@ -442,9 +465,11 @@ private struct LoginSheetView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var rememberMe = false
+    @State private var useMockAccount = false
     @State private var isLoading = false
     @State private var message: String?
     @State private var keyboardHeight: CGFloat = 0
+    @AppStorage("usesMockAccount") private var usesMockAccount = false
 
     private let supabase = SupabaseManager.shared
 
@@ -617,6 +642,9 @@ private struct LoginSheetView: View {
         Task {
             do {
                 try await supabase.auth.signIn(email: email, password: password)
+                await MainActor.run {
+                    usesMockAccount = useMockAccount
+                }
             } catch {
                 message = error.localizedDescription
             }
@@ -918,7 +946,7 @@ final class ScreenTimeModel: ObservableObject {
     func applySelection() {
         guard isAuthorized else { return }
         store.shield.applications = selection.applicationTokens
-        store.shield.applicationCategories = selection.categoryTokens
+        store.shield.applicationCategories = .specific(selection.categoryTokens)
         saveSelection()
     }
 
@@ -939,6 +967,7 @@ final class ScreenTimeModel: ObservableObject {
 
 private struct ScreenTimeSetupView: View {
     @ObservedObject var model: ScreenTimeModel
+    let onSkipSetup: () -> Void
     @State private var showingPicker = false
 
     var body: some View {
@@ -977,17 +1006,21 @@ private struct ScreenTimeSetupView: View {
                         .font(.system(size: 14))
                         .foregroundColor(.black.opacity(0.6))
                 } else {
-                    Text("Pick at least one app or category to continue.")
+                    Text("Picking apps is optional. You can also skip setup.")
                         .font(.system(size: 14))
                         .foregroundColor(.black.opacity(0.6))
                 }
+
+                Button(action: onSkipSetup) {
+                    Text("Skip setup")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.black.opacity(0.65))
+                }
             } else {
                 Button(action: {
-                    Task {
-                        await model.requestAuthorization()
-                    }
+                    onSkipSetup()
                 }) {
-                    Text("Enable Screen Time")
+                    Text("Skip Setup")
                         .font(.system(size: 18, weight: .medium, design: .serif))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
@@ -996,6 +1029,16 @@ private struct ScreenTimeSetupView: View {
                         .clipShape(Capsule())
                 }
                 .padding(.horizontal, 28)
+
+                Button(action: {
+                    Task {
+                        await model.requestAuthorization()
+                    }
+                }) {
+                    Text("Enable Screen Time")
+                        .font(.system(size: 16, weight: .regular, design: .serif))
+                        .foregroundColor(.black.opacity(0.7))
+                }
 
                 Text("We’ll ask permission to access Screen Time.")
                     .font(.system(size: 14))

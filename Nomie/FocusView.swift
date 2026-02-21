@@ -396,7 +396,7 @@ struct MyGoalsHeader: View {
 struct LimitGoals: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
-        Text("Limit").font(.custom("SortsMillGoudy-Regular", size:32, )).frame(maxWidth: .infinity, alignment:.leading).padding(.leading, 13)
+        Text("Limit").font(.custom("SortsMillGoudy-Regular", size: 32)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 13)
         ForEach(usage.filter {$0.type == .Limit}) {item in
             ProgressComponent(categoryUsage: item).padding(.horizontal, 30).padding(.vertical, 8)
         }
@@ -405,7 +405,7 @@ struct LimitGoals: View {
 struct PrioritizeGoals: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
-        Text("Prioritize").font(.custom("SortsMillGoudy-Regular", size:32, )).frame(maxWidth: .infinity, alignment:.leading).padding(.leading, 13)
+        Text("Prioritize").font(.custom("SortsMillGoudy-Regular", size: 32)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 13)
         ForEach(usage.filter {$0.type == .Prioritize}) {item in
             ProgressComponent(categoryUsage: item).padding(.horizontal, 30).padding(.vertical, 8)
         }
