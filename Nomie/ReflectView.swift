@@ -27,8 +27,32 @@ struct ReflectView: View {
     }
 
     private var moodStreakDays: Int {
+        guard let latestLoggedDate = latestLoggedMoodDate else { return 0 }
+        let today = calendar.startOfDay(for: Date())
+        let daysSinceLatest = calendar.dateComponents([.day], from: latestLoggedDate, to: today).day ?? .max
+
+        // Keep streak on the first unlogged day, then reset if another day passes.
+        guard daysSinceLatest <= 1 else { return 0 }
+        return streakEnding(on: latestLoggedDate)
+    }
+
+    private func yesterdayReflectionPrompt(for mood: ReflectMoodOption) -> String {
+        let moodName = mood.name.lowercased()
+        let emotionNoun = mood.reflectionEmotionNoun
+        return """
+        What made you \(moodName) yesterday? What are some ways you expressed and felt your \(emotionNoun)? How does this relate to your goals and productivity yesterday?
+        """
+    }
+
+    private var latestLoggedMoodDate: Date? {
+        loggedMoods.keys
+            .compactMap { date(for: $0) }
+            .max()
+    }
+
+    private func streakEnding(on endDate: Date) -> Int {
         var streak = 0
-        var probeDate = calendar.startOfDay(for: Date())
+        var probeDate = calendar.startOfDay(for: endDate)
 
         while true {
             let key = ReflectDateKey(date: probeDate, calendar: calendar)
@@ -41,11 +65,12 @@ struct ReflectView: View {
         return streak
     }
 
-    private func yesterdayReflectionPrompt(for mood: ReflectMoodOption) -> String {
-        let moodName = mood.name.lowercased()
-        return """
-        What made you \(moodName) yesterday? What are some ways you expressed and felt your \(moodName)? How does this relate to your goals and productivity yesterday?
-        """
+    private func date(for key: ReflectDateKey) -> Date? {
+        var components = DateComponents()
+        components.year = key.year
+        components.month = key.month
+        components.day = key.day
+        return calendar.date(from: components).map { calendar.startOfDay(for: $0) }
     }
 
     private var journalDateLabel: String {
@@ -75,22 +100,24 @@ struct ReflectView: View {
                     }
 
                     if let yesterdayMood {
-                        HStack(alignment: .top, spacing: 16) {
-                            VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .top, spacing: 14) {
+                            VStack(alignment: .center, spacing: 10) {
                                 Text("Reflect on yesterday:")
                                     .font(.custom("SortsMillGoudy-Italic", size: 22))
                                     .foregroundStyle(inkColor.opacity(0.92))
+                                    .multilineTextAlignment(.center)
 
                                 Text(yesterdayReflectionPrompt(for: yesterdayMood))
                                     .font(.custom("Poppins-Regular", size: 14))
                                     .foregroundStyle(inkColor.opacity(0.88))
                                     .lineSpacing(2)
+                                    .multilineTextAlignment(.center)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .center)
 
                             ReflectYesterdayMoodSummary(mood: yesterdayMood)
-                                .frame(width: 128)
+                                .frame(maxWidth: .infinity, alignment: .top)
                         }
                     }
 
@@ -435,13 +462,13 @@ struct ReflectYesterdayMoodSummary: View {
                 .foregroundStyle(Color.black.opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
 
             MoodAssetImage(assetName: mood.assetName, intensity: 0.85)
-                .frame(width: 106, height: 106)
+                .frame(width: 122, height: 122)
 
             Text(mood.name)
-                .font(.custom("Poppins-Regular", size: 16))
+                .font(.custom("Poppins-Regular", size: 18))
                 .foregroundStyle(Color.black.opacity(0.88))
         }
         .frame(maxWidth: .infinity, alignment: .top)
@@ -514,6 +541,99 @@ struct ReflectCard<Content: View>: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(Color.black.opacity(0.14), lineWidth: 1)
+            )
+    }
+}
+
+struct ReflectGradientCard<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.95, green: 0.92, blue: 0.74),
+                                    Color(red: 0.94, green: 0.84, blue: 0.56)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 0.95, green: 0.45, blue: 0.57).opacity(0.45),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: 8,
+                                endRadius: 170
+                            )
+                        )
+
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 0.74, green: 0.9, blue: 0.88).opacity(0.45),
+                                    .clear
+                                ],
+                                center: .trailing,
+                                startRadius: 8,
+                                endRadius: 180
+                            )
+                        )
+                }
+                .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.black.opacity(0.14), lineWidth: 1)
+            )
+    }
+}
+
+struct ReflectTodayGradientCard<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.93, green: 0.9, blue: 0.58),
+                                Color(red: 0.97, green: 0.6, blue: 0.71),
+                                Color(red: 0.95, green: 0.86, blue: 0.63)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 5)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.white.opacity(0.45), lineWidth: 1)
             )
     }
 }
@@ -622,10 +742,10 @@ struct DailyMoodView: View {
         ScrollView {
             VStack(spacing: 20) {
                 Text("Daily Mood")
-                    .font(.custom("Georgia", size: 32))
+                    .font(.custom("SortsMillGoudy-Regular", size: 34))
                     .foregroundStyle(Color.black.opacity(0.85))
                 Text("How was your overall mood today?")
-                    .font(.custom("AvenirNext-Regular", size: 15))
+                    .font(.custom("SortsMillGoudy-Italic", size: 18))
                     .foregroundStyle(Color.black.opacity(0.6))
 
                 MoodOrbitPicker(
@@ -646,40 +766,10 @@ struct DailyMoodView: View {
                         }
                     }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Mood Levels")
-                        .font(.custom("Georgia", size: 22))
-                        .foregroundStyle(Color.black.opacity(0.8))
-                    ReflectCard {
-                        VStack(spacing: 16) {
-                            Text("How much did you experience each of these moods today?")
-                                .font(.custom("AvenirNext-Medium", size: 13))
-                                .foregroundStyle(Color.black.opacity(0.7))
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .multilineTextAlignment(.center)
-                                .padding(.bottom, 6)
-                            if let selectedMoodIndex, ReflectMoodOption.moods.indices.contains(selectedMoodIndex) {
-                                ForEach($moodLevels) { $level in
-                                    MoodLevelRow(
-                                        level: $level,
-                                        mood: ReflectMoodOption.moods[selectedMoodIndex]
-                                    )
-                                }
-                            } else {
-                                Text("Select a mood to personalize your levels.")
-                                    .font(.custom("AvenirNext-Regular", size: 13))
-                                    .foregroundStyle(Color.black.opacity(0.55))
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.vertical, 12)
-                            }
-                        }
-                    }
-                }
-
-                ReflectCard {
+                ReflectGradientCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Past 7 days")
-                            .font(.custom("AvenirNext-Medium", size: 14))
+                            .font(.custom("SortsMillGoudy-Regular", size: 24))
                             .foregroundStyle(Color.black.opacity(0.7))
                         HStack(spacing: 10) {
                             ForEach(last7Days()) { day in
@@ -696,9 +786,9 @@ struct DailyMoodView: View {
                                             .frame(width: 34, height: 34)
                                     }
                                     Text(day.dayLabel)
-                                        .font(.custom("AvenirNext-Medium", size: 11))
+                                        .font(.custom("Poppins-Regular", size: 10))
                                     Text(day.dateLabel)
-                                        .font(.custom("AvenirNext-Regular", size: 11))
+                                        .font(.custom("Poppins-Regular", size: 10))
                                         .foregroundStyle(Color.black.opacity(0.6))
                                 }
                                 .frame(maxWidth: .infinity)
@@ -707,7 +797,38 @@ struct DailyMoodView: View {
                     }
                 }
 
-                ReflectCard {
+                ReflectTodayGradientCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Mood Levels")
+                            .font(.custom("SortsMillGoudy-Regular", size: 28))
+                            .foregroundStyle(Color.black.opacity(0.8))
+
+                        Rectangle()
+                            .fill(Color.black.opacity(0.25))
+                            .frame(height: 1)
+
+                        Text("How much did you experience each of these moods today?")
+                            .font(.custom("SortsMillGoudy-Italic", size: 18))
+                            .foregroundStyle(Color.black.opacity(0.7))
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .multilineTextAlignment(.center)
+                            .padding(.bottom, 6)
+
+                        if let selectedMoodIndex, ReflectMoodOption.moods.indices.contains(selectedMoodIndex) {
+                            ForEach($moodLevels) { $level in
+                                MoodLevelRow(level: $level)
+                            }
+                        } else {
+                            Text("Select a mood to personalize your levels.")
+                                .font(.custom("Poppins-Regular", size: 12))
+                                .foregroundStyle(Color.black.opacity(0.55))
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 12)
+                        }
+                    }
+                }
+
+                ReflectTodayGradientCard {
                     VStack(spacing: 12) {
                         HStack {
                             Button {
@@ -718,7 +839,7 @@ struct DailyMoodView: View {
                             }
                             Spacer()
                             Text(monthTitle(currentMonth))
-                                .font(.custom("Georgia", size: 22))
+                                .font(.custom("SortsMillGoudy-Italic", size: 22))
                             Spacer()
                             Button {
                                 currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
@@ -733,7 +854,7 @@ struct DailyMoodView: View {
                         HStack {
                             ForEach(["Su", "M", "Tu", "W", "Th", "F", "S"], id: \.self) { day in
                                 Text(day)
-                                    .font(.custom("AvenirNext-Bold", size: 11))
+                                    .font(.custom("Poppins-Regular", size: 11))
                                     .foregroundStyle(Color.black.opacity(0.85))
                                     .tracking(0.6)
                                     .frame(maxWidth: .infinity)
@@ -742,7 +863,8 @@ struct DailyMoodView: View {
                         .padding(.bottom, 2)
 
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
-                            ForEach(monthGridDays(for: currentMonth), id: \.self) { day in
+                            let gridDays = monthGridDays(for: currentMonth)
+                            ForEach(Array(gridDays.enumerated()), id: \.offset) { _, day in
                                 if day == 0 {
                                     Color.clear.frame(height: 32)
                                 } else {
@@ -757,7 +879,7 @@ struct DailyMoodView: View {
                                             Color.clear.frame(width: 26, height: 26)
                                         }
                                         Text("\(day)")
-                                            .font(.custom("AvenirNext-Regular", size: 11))
+                                            .font(.custom("Poppins-Regular", size: 10))
                                             .foregroundStyle(Color.black.opacity(moodForDay(day, in: currentMonth) == nil ? 0.3 : 0.75))
                                     }
                                 }
@@ -769,7 +891,7 @@ struct DailyMoodView: View {
                 if !mostExperiencedMoods.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Most experienced moods")
-                            .font(.custom("AvenirNext-Medium", size: 14))
+                            .font(.custom("SortsMillGoudy-Regular", size: 24))
                             .foregroundStyle(Color.black.opacity(0.7))
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 2), spacing: 14) {
                             ForEach(mostExperiencedMoods) { item in
@@ -906,7 +1028,7 @@ struct MoodOrbitPicker: View {
                         MoodAssetImage(assetName: selectedMood.assetName, intensity: 0.85)
                             .frame(width: 130, height: 130)
                         Text(selectedMood.name)
-                            .font(.custom("AvenirNext-Medium", size: 14))
+                            .font(.custom("SortsMillGoudy-Regular", size: 22))
                             .foregroundStyle(Color.black.opacity(0.8))
                     }
                     .position(x: center.x, y: center.y)
@@ -919,7 +1041,7 @@ struct MoodOrbitPicker: View {
                             )
                             .frame(width: 130, height: 130)
                         Text("Select a mood")
-                            .font(.custom("AvenirNext-Medium", size: 13))
+                            .font(.custom("SortsMillGoudy-Italic", size: 16))
                             .foregroundStyle(Color.black.opacity(0.6))
                     }
                     .position(x: center.x, y: center.y)
@@ -2655,31 +2777,52 @@ struct ReflectMoodOption: Identifiable, Equatable, Hashable {
     static func fromName(_ name: String) -> ReflectMoodOption? {
         moods.first { $0.name == name }
     }
+
+    var reflectionEmotionNoun: String {
+        switch name {
+        case "Happy": return "happiness"
+        case "Fine": return "sense of feeling fine"
+        case "Frustrated": return "frustration"
+        case "Anxious": return "anxiety"
+        case "Excited": return "excitement"
+        case "Sad": return "sadness"
+        case "Tired": return "tiredness"
+        case "Bored": return "boredom"
+        case "Content": return "contentment"
+        default: return name.lowercased()
+        }
+    }
 }
 
 struct MoodLevelState: Identifiable, Codable, Equatable {
     let id = UUID()
     let label: String
     var value: Double
+
+    var iconAssetName: String {
+        label.lowercased()
+    }
 }
 
 struct MoodLevelRow: View {
     @Binding var level: MoodLevelState
-    let mood: ReflectMoodOption
     private let segmentValues: [Double] = [0, 0.25, 0.5, 0.75, 1]
 
     var body: some View {
         HStack(spacing: 14) {
-            MoodAssetImage(assetName: mood.assetName, intensity: level.value)
-                .frame(width: 28, height: 28)
+            Image(level.iconAssetName)
+                .interpolation(.high)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 20, height: 20)
 
             Text(level.label.capitalized)
-                .font(.custom("AvenirNext-Regular", size: 14))
+                .font(.custom("Poppins-Regular", size: 13))
                 .foregroundStyle(Color.black.opacity(0.8))
                 .frame(width: 86, alignment: .leading)
 
             MoodLevelBar(value: $level.value, segmentValues: segmentValues)
-                .frame(height: 26)
+                .frame(height: 22)
         }
     }
 }
@@ -2692,20 +2835,36 @@ struct MoodLevelBar: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let fillWidth = width * CGFloat(value)
+            let visibleFillWidth: CGFloat = value > 0 ? max(10, fillWidth) : 0
             let segmentCount = max(segmentValues.count - 1, 1)
 
             ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.white)
-                    .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
+                Capsule()
+                    .fill(Color.white.opacity(0.96))
 
-                Rectangle()
-                    .fill(Color.black.opacity(0.08))
-                    .frame(width: max(0, fillWidth))
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.94, green: 0.42, blue: 0.57).opacity(0.85),
+                                Color(red: 0.95, green: 0.63, blue: 0.35).opacity(0.8)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: min(width, visibleFillWidth))
+
+                Capsule()
+                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+
+                Capsule()
+                    .stroke(Color.white.opacity(0.55), lineWidth: 1)
+                    .padding(0.5)
 
                 ForEach(1..<segmentCount, id: \.self) { idx in
                     Rectangle()
-                        .fill(Color.black.opacity(0.08))
+                        .fill(Color.black.opacity(0.1))
                         .frame(width: 1)
                         .position(
                             x: (width * CGFloat(idx)) / CGFloat(segmentCount),
@@ -2713,7 +2872,10 @@ struct MoodLevelBar: View {
                         )
                 }
             }
+            .clipShape(Capsule())
+            .shadow(color: Color.black.opacity(0.14), radius: 2, x: 0, y: 1)
             .contentShape(Rectangle())
+            .animation(.easeOut(duration: 0.12), value: value)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in
@@ -2740,12 +2902,12 @@ struct MostExperiencedMoodCard: View {
     var body: some View {
         VStack(spacing: 8) {
             Text(item.monthLabel)
-                .font(.custom("AvenirNext-Medium", size: 12))
+                .font(.custom("SortsMillGoudy-Italic", size: 14))
                 .foregroundStyle(Color.black.opacity(0.75))
             MoodAssetImage(assetName: item.mood.assetName, intensity: 0.75)
                 .frame(width: 64, height: 64)
             Text(item.mood.name)
-                .font(.custom("AvenirNext-Regular", size: 12))
+                .font(.custom("Poppins-Regular", size: 13))
                 .foregroundStyle(Color.black.opacity(0.7))
         }
         .frame(maxWidth: .infinity)
