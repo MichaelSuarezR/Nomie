@@ -79,6 +79,7 @@ struct MeAppTrackingView: View {
                 }
             }
         }
+        .nomieTabBarContentPadding()
         .background(surfaceColor.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
     }

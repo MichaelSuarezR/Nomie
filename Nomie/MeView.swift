@@ -112,6 +112,7 @@ struct MeView: View {
                     }
                 }
             }
+            .nomieTabBarContentPadding()
             .background(surfaceColor.ignoresSafeArea())
         }
     }

@@ -13,6 +13,7 @@ struct TicketView: View {
             title: "The Late Night Drifter",
             subtitle: "“You chase thoughts when the world sleeps, finding comfort in the glow of midnight scrolls.”",
             goalsSummary: "You tracked 8 categories this week. 6 passed your goals.",
+            heroImageName: "LND",
             breakdown: [
                 TicketBreakdown(label: "Creativity", value: "4h 32m", progress: 0.7),
                 TicketBreakdown(label: "Connection", value: "3h 45m", progress: 0.55)
@@ -24,6 +25,7 @@ struct TicketView: View {
             title: "App Spotlight",
             subtitle: "“The apps that shifted your attention this week.”",
             goalsSummary: "",
+            heroImageName: "LND",
             breakdown: [],
             showsMiniTicket: false,
             kind: .appSpotlight
@@ -32,6 +34,7 @@ struct TicketView: View {
             title: "Emotional Landscape",
             subtitle: "“Your mood and your screen time were linked more than usual.”",
             goalsSummary: "",
+            heroImageName: "LND",
             breakdown: [],
             showsMiniTicket: false,
             kind: .moodLandscape
@@ -40,6 +43,7 @@ struct TicketView: View {
             title: "Week-Over-Week Patterns",
             subtitle: "“You shifted more attention toward late evenings.”",
             goalsSummary: "",
+            heroImageName: "LND",
             breakdown: [],
             showsMiniTicket: false,
             kind: .weekOverWeek
@@ -48,6 +52,7 @@ struct TicketView: View {
             title: "The Intentional Pause",
             subtitle: "“You reached less often, and chose quiet more.”",
             goalsSummary: "You tracked 7 categories this week. 5 passed your goals.",
+            heroImageName: "LND",
             breakdown: [
                 TicketBreakdown(label: "Connection", value: "2h 28m", progress: 0.41),
                 TicketBreakdown(label: "Creativity", value: "3h 22m", progress: 0.58)
@@ -92,6 +97,7 @@ struct TicketView: View {
                     }
                     .padding(.horizontal, 18)
                     .padding(.bottom, 28)
+                    .nomieTabBarContentPadding()
                 }
             }
             .navigationTitle("")
@@ -140,81 +146,48 @@ private struct TicketBackgroundView: View {
 
 private struct TicketHeroImage: View {
     let title: String
+    let imageName: String?
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.08, green: 0.32, blue: 0.62),
-                    Color(red: 0.04, green: 0.25, blue: 0.48),
-                    Color(red: 0.02, green: 0.18, blue: 0.38)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Circle()
-                .fill(Color.white.opacity(0.85))
-                .frame(width: 140, height: 140)
-                .offset(x: -30, y: -8)
-                .blur(radius: 0.6)
-
-            Circle()
-                .fill(Color.white.opacity(0.35))
-                .frame(width: 44, height: 44)
-                .offset(x: -82, y: -40)
-
-            Image(systemName: "star.fill")
-                .font(.system(size: 20))
-                .foregroundColor(Color.white.opacity(0.7))
-                .offset(x: -92, y: -58)
-
-            Group {
-                Circle().fill(Color.white.opacity(0.85)).frame(width: 6, height: 6).offset(x: 34, y: -26)
-                Circle().fill(Color.white.opacity(0.75)).frame(width: 4, height: 4).offset(x: 52, y: -16)
-                Circle().fill(Color.white.opacity(0.7)).frame(width: 3, height: 3).offset(x: 68, y: -34)
-                Circle().fill(Color.white.opacity(0.65)).frame(width: 5, height: 5).offset(x: 82, y: -20)
-                Circle().fill(Color.white.opacity(0.6)).frame(width: 4, height: 4).offset(x: 98, y: -30)
-                Circle().fill(Color.white.opacity(0.7)).frame(width: 6, height: 6).offset(x: 110, y: -16)
-                Circle().fill(Color.white.opacity(0.55)).frame(width: 3, height: 3).offset(x: 118, y: -38)
-                Circle().fill(Color.white.opacity(0.6)).frame(width: 4, height: 4).offset(x: 128, y: -24)
-                Circle().fill(Color.white.opacity(0.5)).frame(width: 3, height: 3).offset(x: 140, y: -32)
-                Circle().fill(Color.white.opacity(0.6)).frame(width: 5, height: 5).offset(x: 150, y: -18)
+            if let imageName {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .scaleEffect(1.03)
+                    .clipped()
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.08, green: 0.32, blue: 0.62),
+                        Color(red: 0.04, green: 0.25, blue: 0.48),
+                        Color(red: 0.02, green: 0.18, blue: 0.38)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             }
-
-            Group {
-                Circle().fill(Color.white.opacity(0.85)).frame(width: 7, height: 7).offset(x: 58, y: 2)
-                Circle().fill(Color.white.opacity(0.7)).frame(width: 4, height: 4).offset(x: 74, y: -4)
-                Circle().fill(Color.white.opacity(0.6)).frame(width: 5, height: 5).offset(x: 88, y: 8)
-                Circle().fill(Color.white.opacity(0.65)).frame(width: 3, height: 3).offset(x: 104, y: 4)
-                Circle().fill(Color.white.opacity(0.55)).frame(width: 4, height: 4).offset(x: 118, y: 10)
-                Circle().fill(Color.white.opacity(0.5)).frame(width: 3, height: 3).offset(x: 132, y: 4)
-            }
-
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white.opacity(0.6))
-                    .frame(width: 34, height: 34)
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(0.55))
-                    .frame(width: 42, height: 32)
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(0.45))
-                    .frame(width: 52, height: 30)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(10)
 
             VStack(alignment: .leading, spacing: 0) {
                 Spacer()
-                Text(title)
-                    .font(.custom("SortsMillGoudy-Regular", size: 26))
+                Text(displayTitle)
+                    .font(.custom("SortsMillGoudy-Regular", size: 32))
                     .foregroundColor(.white)
+                    .multilineTextAlignment(.leading)
+                    .shadow(color: Color.black.opacity(1), radius: 12, x: 0, y: 8)
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
+    }
+
+    private var displayTitle: String {
+        if title == "The Late Night Drifter" {
+            return "The Late\nNight Drifter"
+        }
+        return title
     }
 }
 
@@ -225,10 +198,10 @@ private struct TicketStoryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            TicketHeroImage(title: page.title)
-                .frame(height: 200)
+            TicketHeroImage(title: page.title, imageName: page.heroImageName)
+                .frame(height: 290)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 0)
 
             TicketStoryProgress(pageCount: pageCount, currentIndex: currentIndex)
                 .padding(.horizontal, 12)
@@ -282,7 +255,10 @@ private struct TicketInsightsBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if page.showsMiniTicket {
-                TicketMiniCard()
+                Image("LNDT")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
             }
 
             HStack(spacing: 8) {
@@ -332,7 +308,7 @@ private struct TicketInsightsBody: View {
                 .font(.custom("Poppins-Regular", size: 13))
                 .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
 
-            TicketSectionLabel(text: "Pattern Insights")
+            TicketSectionLabel(text: "Pattern Insights:")
             TicketPatternInsightsSection()
 
             TicketSectionLabel(text: "Goals Progress")
@@ -536,6 +512,7 @@ private struct TicketStoryPage {
     let title: String
     let subtitle: String
     let goalsSummary: String
+    let heroImageName: String?
     let breakdown: [TicketBreakdown]
     let showsMiniTicket: Bool
     let kind: TicketStoryKind

@@ -8,28 +8,137 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var selectedTab: AppTab = .focus
+    private let tabBarHeight: CGFloat = 70
+    private let tabBarBottomPadding: CGFloat = 10
+    private let tabBarExtraClearance: CGFloat = 24
+
     var body: some View {
-        TabView {
-            FocusView()
-                .tabItem {
-                    Label("Focus", systemImage: "bolt.circle")
+        ZStack {
+            Group {
+                switch selectedTab {
+                case .focus:
+                    FocusView()
+                case .ticket:
+                    TicketView()
+                case .reflect:
+                    ReflectView()
+                case .me:
+                    MeView()
                 }
-
-            TicketView()
-                .tabItem {
-                    Label("Ticket", systemImage: "ticket")
-                }
-
-            ReflectView()
-                .tabItem {
-                    Label("Reflect", systemImage: "sparkles")
-                }
-
-            MeView()
-                .tabItem {
-                    Label("Me", systemImage: "person.crop.circle")
-                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear
+                .frame(height: tabBarHeight + tabBarBottomPadding + tabBarExtraClearance)
+        }
+        .overlay(alignment: .bottom) {
+            NomieTabBar(selectedTab: $selectedTab)
+                .padding(.horizontal, 16)
+                .padding(.bottom, tabBarBottomPadding)
+        }
+    }
+}
+
+private enum AppTab: CaseIterable {
+    case focus
+    case ticket
+    case reflect
+    case me
+
+    var title: String {
+        switch self {
+        case .focus: return "Focus"
+        case .ticket: return "Ticket"
+        case .reflect: return "Reflect"
+        case .me: return "Me"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .focus: return "square.grid.2x2.fill"
+        case .ticket: return "ticket.fill"
+        case .reflect: return "pencil"
+        case .me: return "person.fill"
+        }
+    }
+}
+
+private struct NomieTabBar: View {
+    @Binding var selectedTab: AppTab
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(AppTab.allCases, id: \.self) { tab in
+                TabBarButton(
+                    tab: tab,
+                    isSelected: tab == selectedTab
+                ) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        selectedTab = tab
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.98, green: 0.86, blue: 0.76),
+                            Color(red: 0.99, green: 0.65, blue: 0.56)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(Color.white.opacity(0.7), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.12), radius: 12, x: 0, y: 6)
+    }
+}
+
+private struct TabBarButton: View {
+    let tab: AppTab
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            if isSelected {
+                HStack(spacing: 10) {
+                    Image(systemName: tab.systemImage)
+                        .font(.system(size: 18, weight: .semibold))
+                    Text(tab.title)
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .foregroundColor(Color(red: 0.95, green: 0.30, blue: 0.42))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(
+                    Capsule()
+                        .fill(Color.white)
+                        .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 4)
+                )
+            } else {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.9))
+                    Image(systemName: tab.systemImage)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(Color(red: 0.95, green: 0.30, blue: 0.42))
+                }
+                .frame(width: 50, height: 50)
+                .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 4)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

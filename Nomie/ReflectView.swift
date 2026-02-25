@@ -903,6 +903,7 @@ struct DailyMoodView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
+            .nomieTabBarContentPadding()
         }
         .background(Color(red: 0.97, green: 0.97, blue: 0.97))
         .navigationBarBackButtonHidden(true)

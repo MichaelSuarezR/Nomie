@@ -22,6 +22,7 @@ struct FocusView: View {
                     FocusHeader(name: "Nomie")
                     DashboardWrapper(streakDays: 8, category: "Creativity", timeOfDay: getTimeOfDayText(), usage: $usage)
                 }
+                .nomieTabBarContentPadding()
             }
             .ignoresSafeArea(edges: .top)
             .background(Color(FocusColors.tempBackground))

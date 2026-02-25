@@ -8,6 +8,7 @@ import Supabase
 import UIKit
 import FamilyControls
 import ManagedSettings
+import Combine
 
 struct OnboardingFlowView: View {
     @EnvironmentObject private var appState: AppState
@@ -465,11 +466,9 @@ private struct LoginSheetView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var rememberMe = false
-    @State private var useMockAccount = false
     @State private var isLoading = false
     @State private var message: String?
     @State private var keyboardHeight: CGFloat = 0
-    @AppStorage("usesMockAccount") private var usesMockAccount = false
 
     private let supabase = SupabaseManager.shared
 
@@ -558,18 +557,6 @@ private struct LoginSheetView: View {
                 }
                 .padding(.horizontal, 30)
 
-                Button(action: { useMockAccount.toggle() }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: useMockAccount ? "checkmark.square.fill" : "square")
-                            .foregroundColor(.black.opacity(0.7))
-                        Text("Mock account")
-                            .font(.system(size: 14))
-                            .foregroundColor(.black.opacity(0.75))
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 30)
-
                 if let message {
                     Text(message)
                         .font(.subheadline)
@@ -642,9 +629,6 @@ private struct LoginSheetView: View {
         Task {
             do {
                 try await supabase.auth.signIn(email: email, password: password)
-                await MainActor.run {
-                    usesMockAccount = useMockAccount
-                }
             } catch {
                 message = error.localizedDescription
             }
