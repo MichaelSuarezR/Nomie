@@ -8,9 +8,19 @@ import UIKit
 
 private let reflectLandingMoodCardHeight: CGFloat = 228
 
+enum ReflectLandingSection: String, CaseIterable, Identifiable {
+    case dailyMood = "Daily Mood"
+    case selfJournal = "Self-Journal"
+    case patternsTrends = "Patterns & Trends"
+
+    var id: String { rawValue }
+}
+
 struct ReflectView: View {
     @State private var loggedMoods: [ReflectDateKey: ReflectMoodOption] = [:]
     @State private var journalPrompt = ReflectJournalPrompt.randomPrompt()
+    @State private var selectedLandingSection: ReflectLandingSection = .dailyMood
+    @State private var activeLandingSection: ReflectLandingSection?
     private let calendar = Calendar.current
     private let tabBarColor = Color(red: 0.97, green: 0.97, blue: 0.97)
     private let surfaceColor = Color(red: 0.985, green: 0.975, blue: 0.955)
@@ -83,7 +93,10 @@ struct ReflectView: View {
                 VStack(spacing: 20) {
                     ReflectHeader()
 
-                    ReflectLandingTabs()
+                    ReflectLandingTabs(selectedSection: selectedLandingSection) { section in
+                        selectedLandingSection = section
+                        activeLandingSection = section
+                    }
 
                     ReflectSectionTitle(text: "Daily Mood")
                     HStack(alignment: .top, spacing: 14) {
@@ -227,6 +240,7 @@ struct ReflectView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
                 .padding(.top, 8)
+                .nomieTabBarContentPadding()
             }
             .background(
                 LinearGradient(
@@ -239,6 +253,20 @@ struct ReflectView: View {
                     endPoint: .bottomTrailing
                 )
             )
+            .navigationDestination(item: $activeLandingSection) { section in
+                switch section {
+                case .dailyMood:
+                    DailyMoodView(loggedMoods: $loggedMoods)
+                case .selfJournal:
+                    SelfJournalView(
+                        initialPrompt: journalPrompt,
+                        onPromptChange: { journalPrompt = $0 },
+                        loggedMoods: $loggedMoods
+                    )
+                case .patternsTrends:
+                    PatternsTrendsView()
+                }
+            }
         }
         .toolbarBackground(tabBarColor, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
@@ -301,11 +329,22 @@ struct ReflectSectionTitle: View {
 }
 
 struct ReflectLandingTabs: View {
+    let selectedSection: ReflectLandingSection
+    let onSelect: (ReflectLandingSection) -> Void
+
     var body: some View {
         HStack(spacing: 10) {
-            ReflectLandingTabChip(title: "Daily Mood", isSelected: true)
-            ReflectLandingTabChip(title: "Self-Journal", isSelected: false)
-            ReflectLandingTabChip(title: "Patterns & Trends", isSelected: false)
+            ForEach(ReflectLandingSection.allCases) { section in
+                Button {
+                    onSelect(section)
+                } label: {
+                    ReflectLandingTabChip(
+                        title: section.rawValue,
+                        isSelected: selectedSection == section
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -743,11 +782,18 @@ struct DailyMoodView: View {
         ScrollView {
             VStack(spacing: 20) {
                 Text("Daily Mood")
-                    .font(.custom("SortsMillGoudy-Regular", size: 34))
-                    .foregroundStyle(Color.black.opacity(0.85))
+                    .font(.custom("SortsMillGoudy-Regular", size: 28))
+                    .foregroundStyle(Color.black.opacity(0.92))
+
+                Rectangle()
+                    .fill(Color.black.opacity(0.7))
+                    .frame(height: 1)
+                    .padding(.horizontal, 6)
+
                 Text("How was your overall mood today?")
-                    .font(.custom("SortsMillGoudy-Italic", size: 18))
-                    .foregroundStyle(Color.black.opacity(0.6))
+                    .font(.custom("SortsMillGoudy-Italic", size: 17))
+                    .foregroundStyle(Color.black.opacity(0.95))
+                    .multilineTextAlignment(.center)
 
                 MoodOrbitPicker(
                     selectedMoodIndex: $selectedMoodIndex,
@@ -831,22 +877,54 @@ struct DailyMoodView: View {
 
                 ReflectTodayGradientCard {
                     VStack(spacing: 12) {
-                        HStack {
+                        HStack(spacing: 14) {
                             Button {
                                 currentMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth) ?? currentMonth
                             } label: {
                                 Image(systemName: "chevron.left")
                                     .font(.system(size: 16, weight: .medium))
+                                    .frame(width: 34, height: 34)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.white.opacity(0.9))
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    )
                             }
-                            Spacer()
+
+                            Spacer(minLength: 6)
                             Text(monthTitle(currentMonth))
-                                .font(.custom("SortsMillGoudy-Italic", size: 22))
-                            Spacer()
+                                .font(.custom("SortsMillGoudy-Italic", size: 24))
+                                .foregroundStyle(Color(red: 0.18, green: 0.08, blue: 0.08))
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 22)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Color.white.opacity(0.95))
+                                        .shadow(color: Color.black.opacity(0.14), radius: 10, x: 0, y: 6)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                                )
+                            Spacer(minLength: 6)
+
                             Button {
                                 currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
                             } label: {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 16, weight: .medium))
+                                    .frame(width: 34, height: 34)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.white.opacity(0.9))
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    )
                             }
                         }
                         .font(.system(size: 16, weight: .medium))
@@ -895,7 +973,8 @@ struct DailyMoodView: View {
                             Text("Most experienced moods")
                                 .font(.custom("SortsMillGoudy-Regular", size: sectionTitleFontSize))
                                 .foregroundStyle(Color.black.opacity(0.86))
-                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .layoutPriority(1)
 
                             MostExperiencedSectionRule()
                         }
@@ -1234,6 +1313,7 @@ struct PatternsTrendsView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
+            .nomieTabBarContentPadding()
         }
         .background(
             LinearGradient(
@@ -1466,7 +1546,6 @@ struct SelfJournalView: View {
     private let entryHint = "Keep it short"
     private let tabBarColor = Color(red: 0.97, green: 0.97, blue: 0.97)
     private let surfaceColor = Color(red: 0.985, green: 0.975, blue: 0.95)
-    private let paperColor = Color(red: 1, green: 0.995, blue: 0.975)
     private let inkColor = Color(red: 0.14, green: 0.14, blue: 0.14)
     private let accentColor = Color(red: 0.16, green: 0.3, blue: 0.22)
     private let onPromptChange: (String) -> Void
@@ -1497,104 +1576,93 @@ struct SelfJournalView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 ReflectJournalSurfaceCard {
-                    VStack(spacing: 16) {
-                        HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Label("Today's prompt", systemImage: "sparkles")
-                                    .font(.custom("AvenirNext-Medium", size: 12))
+                    VStack(spacing: 12) {
+                        HStack(alignment: .top, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Today's prompt")
+                                    .font(.custom("AvenirNext-Medium", size: 11))
                                     .foregroundStyle(inkColor.opacity(0.55))
                                 Text(ReflectJournalPrompt.displayPrompt(prompt))
-                                    .font(.custom("Georgia", size: max(16, ReflectJournalPrompt.promptFontSize(for: prompt) - 6)))
-                                    .foregroundStyle(inkColor.opacity(0.9))
+                                    .font(.custom("Georgia", size: max(14, ReflectJournalPrompt.promptFontSize(for: prompt) - 8)))
+                                    .foregroundStyle(inkColor.opacity(0.88))
+                                    .lineLimit(2)
                                     .multilineTextAlignment(.leading)
-                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            Spacer()
+                            Spacer(minLength: 8)
                             Button {
                                 let newPrompt = ReflectJournalPrompt.randomPrompt()
                                 prompt = newPrompt
                                 onPromptChange(newPrompt)
                             } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "arrow.clockwise")
-                                        .font(.system(size: 11, weight: .semibold))
-                                    Text("New prompt")
-                                        .font(.custom("AvenirNext-Medium", size: 11))
-                                }
-                                .foregroundStyle(inkColor.opacity(0.7))
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .background(
-                                    Capsule()
-                                        .fill(accentColor.opacity(0.18))
-                                )
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(inkColor.opacity(0.75))
+                                    .frame(width: 30, height: 30)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.black.opacity(0.06))
+                                    )
                             }
                             .buttonStyle(.plain)
                         }
 
-                        VStack(alignment: .leading, spacing: 10) {
-                            ZStack(alignment: .topLeading) {
-                                TextEditor(text: $promptResponse)
-                                    .font(.custom("AvenirNext-Regular", size: 14))
-                                    .foregroundStyle(inkColor.opacity(0.86))
-                                    .padding(.horizontal, 10)
-                                    .padding(.top, 12)
-                                    .frame(minHeight: 140, maxHeight: 180)
-                                    .scrollContentBackground(.hidden)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                            .fill(paperColor)
-                                            .overlay(
-                                                ReflectLinedPaper()
-                                                    .padding(.horizontal, 14)
-                                                    .padding(.top, 12)
-                                                    .opacity(0.4)
-                                            )
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                                            )
-                                            .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 8)
-                                    )
-                                    .focused($isEntryFocused)
+                        ZStack(alignment: .topLeading) {
+                            TextEditor(text: $promptResponse)
+                                .font(.custom("AvenirNext-Regular", size: 13))
+                                .foregroundStyle(inkColor.opacity(0.86))
+                                .padding(.horizontal, 8)
+                                .padding(.top, 8)
+                                .frame(minHeight: 92, maxHeight: 118)
+                                .scrollContentBackground(.hidden)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(Color.white.opacity(0.96))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .stroke(
+                                                    isEntryFocused ? accentColor.opacity(0.35) : Color.black.opacity(0.08),
+                                                    lineWidth: 1
+                                                )
+                                        )
+                                )
+                                .focused($isEntryFocused)
 
-                                if promptResponse.isEmpty {
-                                    Text("Start writing...")
-                                        .font(.custom("AvenirNext-Regular", size: 14))
-                                        .foregroundStyle(inkColor.opacity(0.35))
-                                        .padding(.horizontal, 16)
-                                        .padding(.top, 18)
-                                }
-                            }
-
-                            HStack {
-                                Text(entryHint)
-                                    .font(.custom("AvenirNext-Regular", size: 12))
-                                    .foregroundStyle(inkColor.opacity(0.5))
-                                Spacer()
-                                Text("\(wordCount) words")
-                                    .font(.custom("AvenirNext-Medium", size: 11))
-                                    .foregroundStyle(inkColor.opacity(0.45))
+                            if promptResponse.isEmpty {
+                                Text("Start writing...")
+                                    .font(.custom("AvenirNext-Regular", size: 13))
+                                    .foregroundStyle(inkColor.opacity(0.35))
+                                    .padding(.horizontal, 14)
+                                    .padding(.top, 14)
                             }
                         }
 
+                        HStack {
+                            Text(entryHint)
+                                .font(.custom("AvenirNext-Regular", size: 11))
+                                .foregroundStyle(inkColor.opacity(0.48))
+                            Spacer()
+                            Text("\(wordCount) words")
+                                .font(.custom("AvenirNext-Medium", size: 10))
+                                .foregroundStyle(inkColor.opacity(0.45))
+                        }
+
                         if let todayEntryID = todayEntryID {
-                            VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 Text("Tags")
-                                    .font(.custom("AvenirNext-Medium", size: 12))
-                                    .foregroundStyle(inkColor.opacity(0.6))
+                                    .font(.custom("AvenirNext-Medium", size: 11))
+                                    .foregroundStyle(inkColor.opacity(0.58))
                                 ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 8) {
+                                    HStack(spacing: 6) {
                                         ForEach(JournalTag.allCases) { tag in
                                             let isSelected = entryTags[todayEntryID, default: []].contains(tag)
                                             Button {
                                                 toggleTag(tag, for: todayEntryID)
                                             } label: {
                                                 Text(tag.title)
-                                                    .font(.custom("AvenirNext-Medium", size: 12))
+                                                    .font(.custom("AvenirNext-Medium", size: 11))
                                                     .foregroundStyle(isSelected ? Color.black.opacity(0.9) : Color.black.opacity(0.65))
-                                                    .padding(.vertical, 6)
-                                                    .padding(.horizontal, 12)
+                                                    .padding(.vertical, 5)
+                                                    .padding(.horizontal, 10)
                                                     .background(
                                                         Capsule()
                                                             .fill(isSelected ? tag.color.opacity(0.28) : Color.black.opacity(0.06))
@@ -1608,11 +1676,22 @@ struct SelfJournalView: View {
                             }
                         }
 
-                        HStack(spacing: 12) {
+                        HStack(spacing: 8) {
                             Button {
                                 promptResponse = ""
                             } label: {
-                                ReflectJournalActionButton(title: "Clear", systemImage: "xmark", fill: Color.black.opacity(0.06), textColor: inkColor.opacity(0.7))
+                                HStack(spacing: 6) {
+                                    Image(systemName: "xmark")
+                                    Text("Clear")
+                                }
+                                .font(.custom("AvenirNext-Medium", size: 11))
+                                .foregroundStyle(inkColor.opacity(0.72))
+                                .padding(.vertical, 7)
+                                .padding(.horizontal, 12)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.black.opacity(0.06))
+                                )
                             }
                             .buttonStyle(.plain)
 
@@ -1625,15 +1704,17 @@ struct SelfJournalView: View {
                                 promptResponse = ""
                                 isEntryFocused = false
                             } label: {
-                                ReflectJournalActionButton(
-                                    title: "Save entry",
-                                    systemImage: "checkmark",
-                                    fill: LinearGradient(
-                                        colors: [accentColor.opacity(0.18), accentColor.opacity(0.35)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    textColor: inkColor.opacity(0.9)
+                                HStack(spacing: 6) {
+                                    Image(systemName: "checkmark")
+                                    Text("Save")
+                                }
+                                .font(.custom("AvenirNext-Medium", size: 11))
+                                .foregroundStyle(inkColor.opacity(0.88))
+                                .padding(.vertical, 7)
+                                .padding(.horizontal, 14)
+                                .background(
+                                    Capsule()
+                                        .fill(accentColor.opacity(0.2))
                                 )
                             }
                             .buttonStyle(.plain)
@@ -1918,6 +1999,7 @@ struct ReflectJournalCoverSection: View {
     private let tabTextColor = Color.black.opacity(0.8)
     private let tabInactiveColor = Color.black.opacity(0.56)
     private let pageCardBackground = Color(red: 0.98, green: 0.98, blue: 0.97)
+    private let coverPanelHeight: CGFloat = 520
     private var calendar: Calendar {
         var cal = Calendar(identifier: .iso8601)
         cal.timeZone = .current
@@ -2001,6 +2083,7 @@ struct ReflectJournalCoverSection: View {
                     coverImage
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: coverPanelHeight, maxHeight: coverPanelHeight, alignment: .top)
             .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
@@ -2055,11 +2138,11 @@ struct ReflectJournalCoverSection: View {
                 if let cover = UIImage(named: "journal") ?? UIImage(named: "journal.png") {
                     Image(uiImage: cover)
                         .resizable()
-                        .scaledToFit()
+                        .scaledToFill()
                 } else {
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .fill(Color.white.opacity(0.85))
-                        .frame(height: 520)
+                        .frame(height: coverPanelHeight)
                         .overlay(
                             Text("journal.png not found")
                                 .font(.custom("AvenirNext-Medium", size: 13))
@@ -2067,6 +2150,7 @@ struct ReflectJournalCoverSection: View {
                         )
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             LinearGradient(
                 colors: [Color.black.opacity(0.0), Color.black.opacity(0.18)],
@@ -2225,7 +2309,7 @@ struct ReflectJournalCoverSection: View {
                 loggedMoods: $loggedMoods,
                 entryTags: $entryTags,
                 selectedEntryID: $selectedEntryID,
-                preferredHeight: 560
+                preferredHeight: coverPanelHeight
             )
             .background(pageCardBackground)
         }
@@ -2364,7 +2448,7 @@ private struct ReflectJournalPageCard<Content: View>: View {
     var body: some View {
         content
             .padding(18)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .fill(Color(red: 0.98, green: 0.98, blue: 0.97))
