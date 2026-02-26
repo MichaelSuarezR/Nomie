@@ -733,6 +733,7 @@ struct DailyMoodView: View {
     ]
     @State private var currentMonth = Date()
     private let calendar = Calendar.current
+    private let sectionTitleFontSize: CGFloat = 20
     @Environment(\.dismiss) private var dismiss
     private var todayKey: ReflectDateKey {
         ReflectDateKey(date: Date(), calendar: calendar)
@@ -769,7 +770,7 @@ struct DailyMoodView: View {
                 ReflectGradientCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Past 7 days")
-                            .font(.custom("SortsMillGoudy-Regular", size: 24))
+                            .font(.custom("SortsMillGoudy-Regular", size: sectionTitleFontSize))
                             .foregroundStyle(Color.black.opacity(0.7))
                         HStack(spacing: 10) {
                             ForEach(last7Days()) { day in
@@ -800,7 +801,7 @@ struct DailyMoodView: View {
                 ReflectTodayGradientCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Mood Levels")
-                            .font(.custom("SortsMillGoudy-Regular", size: 28))
+                            .font(.custom("SortsMillGoudy-Regular", size: sectionTitleFontSize))
                             .foregroundStyle(Color.black.opacity(0.8))
 
                         Rectangle()
@@ -889,11 +890,23 @@ struct DailyMoodView: View {
                 }
 
                 if !mostExperiencedMoods.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Most experienced moods")
-                            .font(.custom("SortsMillGoudy-Regular", size: 24))
-                            .foregroundStyle(Color.black.opacity(0.7))
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 2), spacing: 14) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 12) {
+                            Text("Most experienced moods")
+                                .font(.custom("SortsMillGoudy-Regular", size: sectionTitleFontSize))
+                                .foregroundStyle(Color.black.opacity(0.86))
+                                .lineLimit(1)
+
+                            MostExperiencedSectionRule()
+                        }
+
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 14),
+                                GridItem(.flexible(), spacing: 14)
+                            ],
+                            spacing: 14
+                        ) {
                             ForEach(mostExperiencedMoods) { item in
                                 MostExperiencedMoodCard(item: item)
                             }
@@ -951,6 +964,15 @@ struct DailyMoodView: View {
                 mood: mood
             )
         }
+    }
+}
+
+private struct MostExperiencedSectionRule: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.black.opacity(0.32))
+            .frame(height: 0.7)
+            .frame(maxWidth: .infinity)
     }
 }
 
@@ -1441,7 +1463,7 @@ struct SelfJournalView: View {
     @FocusState private var isEntryFocused: Bool
     private let today = Date()
     private let calendar = Calendar.current
-    private let entryHint = "Keep it short — one to three sentences."
+    private let entryHint = "Keep it short"
     private let tabBarColor = Color(red: 0.97, green: 0.97, blue: 0.97)
     private let surfaceColor = Color(red: 0.985, green: 0.975, blue: 0.95)
     private let paperColor = Color(red: 1, green: 0.995, blue: 0.975)
@@ -1466,10 +1488,10 @@ struct SelfJournalView: View {
             VStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Self-Journal")
-                        .font(.custom("Georgia", size: 32))
+                        .font(.custom("Georgia", size: 24))
                         .foregroundStyle(inkColor.opacity(0.9))
                     Text("Today • \(ReflectJournalPrompt.dateLabel(today))")
-                        .font(.custom("AvenirNext-Medium", size: 12))
+                        .font(.custom("AvenirNext-Medium", size: 11))
                         .foregroundStyle(inkColor.opacity(0.55))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -1482,7 +1504,7 @@ struct SelfJournalView: View {
                                     .font(.custom("AvenirNext-Medium", size: 12))
                                     .foregroundStyle(inkColor.opacity(0.55))
                                 Text(ReflectJournalPrompt.displayPrompt(prompt))
-                                    .font(.custom("Georgia", size: ReflectJournalPrompt.promptFontSize(for: prompt)))
+                                    .font(.custom("Georgia", size: max(16, ReflectJournalPrompt.promptFontSize(for: prompt) - 6)))
                                     .foregroundStyle(inkColor.opacity(0.9))
                                     .multilineTextAlignment(.leading)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -1619,105 +1641,38 @@ struct SelfJournalView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Consistency")
-                        .font(.custom("Georgia", size: 22))
-                        .foregroundStyle(inkColor.opacity(0.85))
-                    ReflectJournalSurfaceCard {
-                        HStack(spacing: 16) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Current streak")
-                                    .font(.custom("AvenirNext-Medium", size: 12))
-                                    .foregroundStyle(inkColor.opacity(0.6))
-                                Text("\(currentStreak) days")
-                                    .font(.custom("Georgia", size: 22))
-                                    .foregroundStyle(inkColor.opacity(0.9))
-                            }
-                            Spacer()
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Longest streak")
-                                    .font(.custom("AvenirNext-Medium", size: 12))
-                                    .foregroundStyle(inkColor.opacity(0.6))
-                                Text("\(longestStreak) days")
-                                    .font(.custom("Georgia", size: 22))
-                                    .foregroundStyle(inkColor.opacity(0.9))
-                            }
-                        }
+                ReflectJournalSurfaceCard {
+                    VStack(alignment: .center, spacing: 14) {
+                        Text("Take time to reflect")
+                            .font(.custom("SortsMillGoudy-Italic", size: 18))
+                            .foregroundStyle(inkColor.opacity(0.84))
+                            .multilineTextAlignment(.center)
+
+                        Rectangle()
+                            .fill(Color.black.opacity(0.3))
+                            .frame(height: 1)
+
+                        Text("How did you consciously move toward achieving your goals? Unconsciously? What are some ways you were more productive this week than last week?")
+                            .font(.custom("AvenirNext-Regular", size: 14))
+                            .foregroundStyle(inkColor.opacity(0.82))
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    .frame(maxWidth: .infinity)
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Achievements & Stamps")
-                        .font(.custom("Georgia", size: 22))
-                        .foregroundStyle(inkColor.opacity(0.85))
-                    ReflectJournalSurfaceCard {
-                        if earnedStamps.isEmpty {
-                            Text("No stamps yet.")
-                                .font(.custom("AvenirNext-Regular", size: 13))
-                                .foregroundStyle(inkColor.opacity(0.6))
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.vertical, 10)
-                        } else {
-                            VStack(alignment: .leading, spacing: 14) {
-                                ForEach(earnedStamps) { stamp in
-                                    HStack(spacing: 12) {
-                                        ReflectStampBadge(stamp: stamp)
-                                            .frame(width: 52, height: 52)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(stamp.title.uppercased())
-                                                .font(.custom("AvenirNext-DemiBold", size: 12))
-                                            Text(stamp.subtitle)
-                                                .font(.custom("AvenirNext-Regular", size: 11))
-                                                .foregroundStyle(inkColor.opacity(0.6))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if !earnedStamps.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Stamps")
-                            .font(.custom("AvenirNext-Medium", size: 13))
-                            .foregroundStyle(inkColor.opacity(0.6))
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(earnedStamps) { stamp in
-                                    let isUsed = placedStamps.contains(where: { $0.stamp.id == stamp.id })
-                                    Button {
-                                        guard !isUsed else { return }
-                                        placedStamps.append(
-                                            ReflectPlacedStamp(
-                                                stamp: stamp,
-                                                position: CGPoint(x: 180, y: 36)
-                                            )
-                                        )
-                                    } label: {
-                                        ReflectStampBadge(stamp: stamp)
-                                            .frame(width: 56, height: 56)
-                                            .opacity(isUsed ? 0.35 : 1)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .disabled(isUsed)
-                                }
-                            }
-                            .padding(.horizontal, 4)
-                        }
-                    }
-                }
-
-                ReflectNotebookView(
+                ReflectJournalCoverSection(
                     entries: $journalEntries,
+                    entryTags: $entryTags,
                     placedStamps: $placedStamps,
                     loggedMoods: $loggedMoods,
-                    entryTags: $entryTags,
                     selectedEntryID: $selectedEntryID
                 )
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
+            .nomieTabBarContentPadding()
         }
         .background(
             LinearGradient(
@@ -1940,6 +1895,483 @@ struct ReflectLinedPaper: View {
     }
 }
 
+private enum ReflectJournalCoverTab: String, CaseIterable, Identifiable {
+    case today = "Today"
+    case thisWeek = "This week"
+    case pastEntries = "Past Entries"
+
+    var id: String { rawValue }
+}
+
+struct ReflectJournalCoverSection: View {
+    @Binding var entries: [ReflectJournalEntry]
+    @Binding var entryTags: [UUID: Set<JournalTag>]
+    @Binding var placedStamps: [ReflectPlacedStamp]
+    @Binding var loggedMoods: [ReflectDateKey: ReflectMoodOption]
+    @Binding var selectedEntryID: UUID?
+
+    @State private var selectedTab: ReflectJournalCoverTab = .today
+    @State private var isOpen = false
+    @State private var isWritingToday = false
+    @FocusState private var isTodayEditorFocused: Bool
+
+    private let tabTextColor = Color.black.opacity(0.8)
+    private let tabInactiveColor = Color.black.opacity(0.56)
+    private let pageCardBackground = Color(red: 0.98, green: 0.98, blue: 0.97)
+    private var calendar: Calendar {
+        var cal = Calendar(identifier: .iso8601)
+        cal.timeZone = .current
+        return cal
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                Text("My Journal")
+                    .font(.custom("Georgia", size: 22))
+                    .foregroundStyle(Color.black.opacity(0.85))
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        if isOpen {
+                            isWritingToday = false
+                            isTodayEditorFocused = false
+                        }
+                        isOpen.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: isOpen ? "book.closed" : "book.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(isOpen ? "Close" : "Open")
+                            .font(.custom("AvenirNext-Medium", size: 12))
+                    }
+                    .foregroundStyle(Color.black.opacity(0.75))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 14)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.06))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 0) {
+                ForEach(ReflectJournalCoverTab.allCases) { tab in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            selectedTab = tab
+                            isOpen = true
+                            if tab != .today {
+                                isWritingToday = false
+                                isTodayEditorFocused = false
+                            }
+                        }
+                    } label: {
+                        VStack(spacing: 8) {
+                            Text(tab.rawValue)
+                                .font(.custom("SortsMillGoudy-Regular", size: 13))
+                                .foregroundStyle(selectedTab == tab ? tabTextColor : tabInactiveColor)
+                                .frame(maxWidth: .infinity)
+
+                            Rectangle()
+                                .fill(selectedTab == tab ? Color.black.opacity(0.34) : Color.clear)
+                                .frame(height: 1)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+
+                    if tab != ReflectJournalCoverTab.allCases.last {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.08))
+                            .frame(width: 1, height: 22)
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+
+            Group {
+                if isOpen {
+                    openJournalContent
+                } else {
+                    coverImage
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+            .overlay(alignment: .bottomTrailing) {
+                if isOpen && selectedTab == .today {
+                    Button {
+                        activateWritingMode()
+                    } label: {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.95, green: 0.92, blue: 0.74),
+                                            Color(red: 0.97, green: 0.73, blue: 0.53),
+                                            Color(red: 0.95, green: 0.44, blue: 0.59)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 52, height: 52)
+                                .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 4)
+
+                            if let pencil = UIImage(named: "pencil") ?? UIImage(named: "pencil.png") {
+                                Image(uiImage: pencil)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 24, height: 24)
+                            } else {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 14)
+                }
+            }
+            .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var coverImage: some View {
+        ZStack(alignment: .leading) {
+            Group {
+                if let cover = UIImage(named: "journal") ?? UIImage(named: "journal.png") {
+                    Image(uiImage: cover)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(Color.white.opacity(0.85))
+                        .frame(height: 520)
+                        .overlay(
+                            Text("journal.png not found")
+                                .font(.custom("AvenirNext-Medium", size: 13))
+                                .foregroundStyle(Color.black.opacity(0.5))
+                        )
+                }
+            }
+
+            LinearGradient(
+                colors: [Color.black.opacity(0.0), Color.black.opacity(0.18)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            Text("My Journal")
+                .font(.custom("Georgia", size: 34))
+                .foregroundStyle(Color.white.opacity(0.94))
+                .shadow(color: Color.black.opacity(0.28), radius: 6, x: 0, y: 3)
+                .multilineTextAlignment(.leading)
+                .padding(.leading, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var openJournalContent: some View {
+        switch selectedTab {
+        case .today:
+            ReflectJournalPageCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.92, green: 0.95, blue: 0.77),
+                                    Color(red: 0.98, green: 0.65, blue: 0.57),
+                                    Color(red: 0.98, green: 0.91, blue: 0.92)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(height: 86)
+                        .overlay(
+                            Text(todayPromptLine)
+                                .font(.custom("Georgia", size: 14))
+                                .foregroundStyle(Color.black.opacity(0.88))
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(2)
+                                .padding(.horizontal, 18)
+                        )
+                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
+
+                    HStack(spacing: 12) {
+                        Text("Today (\(dayMonthFormatter.string(from: Date())))")
+                            .font(.custom("SortsMillGoudy-Italic", size: 18))
+                            .foregroundStyle(Color.black.opacity(0.84))
+                            .minimumScaleFactor(0.6)
+                            .lineLimit(1)
+
+                        Rectangle()
+                            .fill(Color.black.opacity(0.3))
+                            .frame(height: 1)
+                    }
+
+                    if isWritingToday {
+                        TextEditor(text: todayJournalTextBinding)
+                            .font(.custom("AvenirNext-Regular", size: 14))
+                            .foregroundStyle(Color.black.opacity(0.84))
+                            .scrollContentBackground(.hidden)
+                            .frame(minHeight: 180)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color.white.opacity(0.88))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    )
+                            )
+                            .focused($isTodayEditorFocused)
+
+                        HStack {
+                            Spacer()
+                            Button("Done") {
+                                isWritingToday = false
+                                isTodayEditorFocused = false
+                            }
+                            .font(.custom("AvenirNext-Medium", size: 12))
+                            .foregroundStyle(Color.black.opacity(0.72))
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 12)
+                            .background(
+                                Capsule()
+                                    .fill(Color.black.opacity(0.06))
+                            )
+                        }
+                    } else {
+                        Text(todayJournalBody)
+                            .font(.custom("AvenirNext-Regular", size: 13))
+                            .foregroundStyle(Color.black.opacity(0.82))
+                            .lineSpacing(3)
+                    }
+
+                    Spacer(minLength: 170)
+                }
+            }
+
+        case .thisWeek:
+            ReflectJournalPageCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("This week")
+                        .font(.custom("SortsMillGoudy-Italic", size: 24))
+                        .foregroundStyle(Color.black.opacity(0.84))
+
+                    HStack(spacing: 10) {
+                        Text("\(monthDayFormatter.string(from: weekDates.first ?? Date())) - \(monthDayFormatter.string(from: weekDates.last ?? Date()))")
+                            .font(.custom("AvenirNext-Medium", size: 11))
+                            .foregroundStyle(Color.black.opacity(0.55))
+                        Rectangle()
+                            .fill(Color.black.opacity(0.2))
+                            .frame(height: 1)
+                    }
+
+                    VStack(spacing: 0) {
+                        ForEach(weekDates, id: \.self) { date in
+                            let entry = entryForDate(date)
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text("\(weekdayFormatter.string(from: date)) (\(dayMonthFormatter.string(from: date)))")
+                                        .font(.custom("AvenirNext-DemiBold", size: 12))
+                                        .foregroundStyle(Color.black.opacity(0.75))
+                                    Spacer()
+                                    if entry != nil {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(Color(red: 0.2, green: 0.45, blue: 0.28))
+                                    }
+                                }
+
+                                Text(weeklyLine(for: entry))
+                                    .font(.custom("AvenirNext-Regular", size: 12))
+                                    .foregroundStyle(Color.black.opacity(0.78))
+                                    .lineLimit(2)
+                            }
+                            .padding(.vertical, 10)
+
+                            if date != weekDates.last {
+                                Rectangle()
+                                    .fill(Color.black.opacity(0.08))
+                                    .frame(height: 1)
+                            }
+                        }
+                    }
+                }
+            }
+
+        case .pastEntries:
+            ReflectNotebookView(
+                entries: $entries,
+                placedStamps: $placedStamps,
+                loggedMoods: $loggedMoods,
+                entryTags: $entryTags,
+                selectedEntryID: $selectedEntryID,
+                preferredHeight: 560
+            )
+            .background(pageCardBackground)
+        }
+    }
+
+    private var todayPromptLine: String {
+        guard let todayEntry = entryForDate(Date()) else {
+            return "I enjoyed ___."
+        }
+
+        let response = todayEntry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        if response.isEmpty {
+            return ReflectJournalPrompt.displayPrompt(todayEntry.prompt)
+        }
+        return filledPromptString(todayEntry.prompt, with: response)
+    }
+
+    private var todayJournalBody: String {
+        guard let todayEntry = entryForDate(Date()) else {
+            return "Log your thoughts, emotions, and events from today."
+        }
+
+        let body = todayEntry.journalText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if body.isEmpty {
+            return "Log your thoughts, emotions, and events from today."
+        }
+        return body
+    }
+
+    private var weekDates: [Date] {
+        guard let start = calendar.dateInterval(of: .weekOfYear, for: Date())?.start else { return [] }
+        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+
+    private func entryForDate(_ date: Date) -> ReflectJournalEntry? {
+        entries.first { calendar.isDate($0.date, inSameDayAs: date) }
+    }
+
+    private var todayJournalTextBinding: Binding<String> {
+        Binding(
+            get: {
+                entryForDate(Date())?.journalText ?? ""
+            },
+            set: { newValue in
+                upsertTodayJournalText(newValue)
+            }
+        )
+    }
+
+    private func weeklyLine(for entry: ReflectJournalEntry?) -> String {
+        guard let entry else { return "No entry yet." }
+
+        let journal = entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !journal.isEmpty {
+            return journal
+        }
+
+        let response = entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !response.isEmpty {
+            return filledPromptString(entry.prompt, with: response)
+        }
+
+        return ReflectJournalPrompt.displayPrompt(entry.prompt)
+    }
+
+    private var weekdayFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.dateFormat = "EEEE"
+        return formatter
+    }
+
+    private var dayMonthFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.dateFormat = "M/d"
+        return formatter
+    }
+
+    private var monthDayFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.dateFormat = "MMM d"
+        return formatter
+    }
+
+    private func activateWritingMode() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isOpen = true
+            selectedTab = .today
+            isWritingToday = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            isTodayEditorFocused = true
+        }
+    }
+
+    private func upsertTodayJournalText(_ text: String) {
+        if let index = entries.firstIndex(where: { calendar.isDate($0.date, inSameDayAs: Date()) }) {
+            entries[index].journalText = text
+            selectedEntryID = entries[index].id
+            return
+        }
+
+        let newEntry = ReflectJournalEntry(
+            date: Date(),
+            prompt: ReflectJournalPrompt.randomPrompt(),
+            promptResponse: "",
+            journalText: text
+        )
+        entries.insert(newEntry, at: 0)
+        selectedEntryID = newEntry.id
+    }
+
+    private func filledPromptString(_ prompt: String, with entry: String) -> String {
+        let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return ReflectJournalPrompt.displayPrompt(prompt) }
+
+        if prompt.contains("...") {
+            return prompt.replacingOccurrences(of: "...", with: trimmed)
+        }
+        if prompt.contains("_____") {
+            return prompt.replacingOccurrences(of: "_____", with: trimmed)
+        }
+        return "\(prompt) \(trimmed)"
+    }
+}
+
+private struct ReflectJournalPageCard<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color(red: 0.98, green: 0.98, blue: 0.97))
+            )
+    }
+}
+
 enum JournalSortOption: String, CaseIterable, Identifiable {
     case recent = "Recent"
     case oldest = "Oldest"
@@ -1954,6 +2386,7 @@ struct ReflectNotebookView: View {
     @Binding var loggedMoods: [ReflectDateKey: ReflectMoodOption]
     @Binding var entryTags: [UUID: Set<JournalTag>]
     @Binding var selectedEntryID: UUID?
+    let preferredHeight: CGFloat
     @FocusState private var focusedEntryID: UUID?
     private let calendar = Calendar.current
     @State private var shareItems: [Any] = []
@@ -1963,6 +2396,22 @@ struct ReflectNotebookView: View {
     @State private var sortOption: JournalSortOption = .recent
     @State private var selectedTag: JournalTag? = nil
     @State private var showEntryDetail = false
+
+    init(
+        entries: Binding<[ReflectJournalEntry]>,
+        placedStamps: Binding<[ReflectPlacedStamp]>,
+        loggedMoods: Binding<[ReflectDateKey: ReflectMoodOption]>,
+        entryTags: Binding<[UUID: Set<JournalTag>]>,
+        selectedEntryID: Binding<UUID?>,
+        preferredHeight: CGFloat = 460
+    ) {
+        _entries = entries
+        _placedStamps = placedStamps
+        _loggedMoods = loggedMoods
+        _entryTags = entryTags
+        _selectedEntryID = selectedEntryID
+        self.preferredHeight = preferredHeight
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -2325,7 +2774,7 @@ struct ReflectNotebookView: View {
                 }
             }
         }
-        .frame(height: 380)
+        .frame(height: preferredHeight)
         .sheet(isPresented: $showShareSheet) {
             ActivityView(activityItems: shareItems)
         }
@@ -2901,22 +3350,33 @@ struct MostExperiencedMoodCard: View {
     let item: MostExperiencedMood
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 0) {
             Text(item.monthLabel)
-                .font(.custom("SortsMillGoudy-Italic", size: 14))
-                .foregroundStyle(Color.black.opacity(0.75))
-            MoodAssetImage(assetName: item.mood.assetName, intensity: 0.75)
-                .frame(width: 64, height: 64)
+                .font(.custom("SortsMillGoudy-Italic", size: 20))
+                .foregroundStyle(Color.black.opacity(0.88))
+
+            Spacer(minLength: 12)
+
+            MoodAssetImage(assetName: item.mood.assetName, intensity: 0.7)
+                .frame(width: 104, height: 104)
+
+            Spacer(minLength: 12)
+
             Text(item.mood.name)
-                .font(.custom("Poppins-Regular", size: 13))
-                .foregroundStyle(Color.black.opacity(0.7))
+                .font(.custom("Poppins-Regular", size: 16))
+                .foregroundStyle(Color.black.opacity(0.9))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, minHeight: 210, alignment: .top)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.black.opacity(0.12))
-                .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 4)
+                .fill(Color.white.opacity(0.9))
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
         )
     }
 }
