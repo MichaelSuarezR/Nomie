@@ -106,14 +106,20 @@ struct TicketView: View {
     }
 }
 
+#Preview {
+    TicketView()
+}
+
 private struct TicketSegmentedHeader: View {
     var body: some View {
-        HStack {
+        HStack(spacing: 0) {
             TicketChip(title: "Archive", isSelected: false)
-            Spacer()
+                .frame(maxWidth: .infinity, alignment: .center)
             TicketChip(title: "Week Ticket", isSelected: true)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 32)
         .padding(.top, 8)
     }
 }
@@ -156,6 +162,7 @@ private struct TicketHeroImage: View {
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .scaleEffect(1.03)
+                    .scaleEffect(x: -1, y: 1)
                     .clipped()
             } else {
                 LinearGradient(
@@ -175,7 +182,9 @@ private struct TicketHeroImage: View {
                     .font(.custom("SortsMillGoudy-Regular", size: 32))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.leading)
-                    .shadow(color: Color.black.opacity(1), radius: 12, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(0.95), radius: 16, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(0.85), radius: 28, x: 0, y: 14)
+                    .shadow(color: Color.black.opacity(0.6), radius: 40, x: 0, y: 20)
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
@@ -255,10 +264,15 @@ private struct TicketInsightsBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if page.showsMiniTicket {
-                Image("LNDT")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity)
+                GeometryReader { proxy in
+                    Image("LNDT")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: proxy.size.width * 1.12)
+                        .offset(x: -5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .frame(height: 300)
             }
 
             HStack(spacing: 8) {
@@ -266,21 +280,14 @@ private struct TicketInsightsBody: View {
                 Spacer()
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.98, green: 0.62, blue: 0.58),
-                                    Color(red: 0.96, green: 0.78, blue: 0.56)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                        .fill(Color.white)
+                        .frame(width: 22, height: 22)
+                        .overlay(
+                            Image("Streak")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 14, height: 14)
                         )
-                        .frame(width: 18, height: 18)
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white)
-                        .offset(x: -18)
                     Text("12")
                         .font(.custom("Poppins-Regular", size: 12))
                         .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
@@ -311,7 +318,18 @@ private struct TicketInsightsBody: View {
             TicketSectionLabel(text: "Pattern Insights:")
             TicketPatternInsightsSection()
 
-            TicketSectionLabel(text: "Goals Progress")
+            HStack(spacing: 6) {
+                Image("target")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 23, height: 23)
+                    .clipShape(Circle())
+                    .offset(y: -2)
+                Text("Goals Progress")
+                    .font(.custom("SortsMillGoudy-Regular", size: 20))
+                    .fontWeight(.bold)
+                    .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+            }
             Text(page.goalsSummary)
                 .font(.custom("Poppins-Regular", size: 11))
                 .foregroundColor(Color.black.opacity(0.65))
@@ -409,17 +427,19 @@ private struct TicketChip: View {
 
     var body: some View {
         Text(title)
-            .font(.custom("Poppins-Regular", size: 11))
-            .foregroundColor(Color.black.opacity(0.7))
-            .padding(.horizontal, 18)
-            .padding(.vertical, 6)
+            .font(.custom("SortsMillGoudy-Regular", size: 18))
+            .foregroundColor(Color(red: 0.24, green: 0.32, blue: 0.20))
+            .padding(.horizontal, 26)
+            .padding(.vertical, 8)
             .background(
-                Capsule()
-                    .fill(Color.white.opacity(0.85))
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white)
             )
             .overlay(
-                Capsule().stroke(isSelected ? Color.black.opacity(0.4) : Color.black.opacity(0.2), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color(red: 0.83, green: 0.88, blue: 0.70), lineWidth: 2)
             )
+            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
     }
 }
 
@@ -428,18 +448,12 @@ private struct TicketSectionLabel: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.98, green: 0.82, blue: 0.66),
-                            Color(red: 0.95, green: 0.56, blue: 0.52)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 8, height: 8)
+            Image("sunset")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 23, height: 23)
+                .clipShape(Circle())
+                .offset(y: -2)
             Text(text)
                 .font(.custom("SortsMillGoudy-Regular", size: 20))
                 .fontWeight(.bold)
