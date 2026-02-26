@@ -9,35 +9,43 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selectedTab: AppTab = .focus
+    @State private var previousTab: AppTab = .focus
     private let tabBarHeight: CGFloat = 70
     private let tabBarBottomPadding: CGFloat = 10
     private let tabBarExtraClearance: CGFloat = 24
+    private let tabOrder: [AppTab] = [.focus, .ticket, .reflect, .me]
 
     var body: some View {
         ZStack {
-            Group {
-                switch selectedTab {
-                case .focus:
-                    FocusView()
-                case .ticket:
-                    TicketView()
-                case .reflect:
-                    ReflectView()
-                case .me:
-                    MeView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            FocusView()
+                .offset(x: offset(for: .focus, in: geometryWidth))
+            TicketView()
+                .offset(x: offset(for: .ticket, in: geometryWidth))
+            ReflectView()
+                .offset(x: offset(for: .reflect, in: geometryWidth))
+            MeView()
+                .offset(x: offset(for: .me, in: geometryWidth))
         }
+        .animation(.easeInOut(duration: 0.25), value: selectedTab)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Color.clear
                 .frame(height: tabBarHeight + tabBarBottomPadding + tabBarExtraClearance)
         }
         .overlay(alignment: .bottom) {
-            NomieTabBar(selectedTab: $selectedTab)
+            NomieTabBar(selectedTab: $selectedTab, previousTab: $previousTab)
                 .padding(.horizontal, 16)
                 .padding(.bottom, tabBarBottomPadding)
         }
+    }
+
+    private var geometryWidth: CGFloat {
+        UIScreen.main.bounds.width
+    }
+
+    private func offset(for tab: AppTab, in width: CGFloat) -> CGFloat {
+        let selectedIndex = tabOrder.firstIndex(of: selectedTab) ?? 0
+        let tabIndex = tabOrder.firstIndex(of: tab) ?? 0
+        return CGFloat(tabIndex - selectedIndex) * width
     }
 }
 
@@ -68,6 +76,7 @@ private enum AppTab: CaseIterable {
 
 private struct NomieTabBar: View {
     @Binding var selectedTab: AppTab
+    @Binding var previousTab: AppTab
 
     var body: some View {
         HStack(spacing: 12) {
@@ -77,6 +86,7 @@ private struct NomieTabBar: View {
                     isSelected: tab == selectedTab
                 ) {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        previousTab = selectedTab
                         selectedTab = tab
                     }
                 }
