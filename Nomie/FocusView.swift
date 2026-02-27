@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Foundation
 import Combine
 struct FocusView: View {
 
@@ -25,7 +26,9 @@ struct FocusView: View {
                 .nomieTabBarContentPadding()
             }
             .ignoresSafeArea(edges: .top)
-            .background(Color(FocusColors.tempBackground))
+            .background(
+                Image("sunset").resizable().ignoresSafeArea().aspectRatio(contentMode: .fill).offset(x:300).scaleEffect(x: -1,y: 1)
+            )
         }
         .navigationTitle("Focus")
 
@@ -40,35 +43,32 @@ struct DashboardWrapper: View {
     var body: some View {
         VStack(spacing: 24) {
             StreaksBar(streakDays: 8)
-            DailyInsights(category: "Creativity", timeOfDay: timeOfDay)
+            WeeklyIntentions(usage: $usage)
             Charts(usage: usage)
-            GoalsView(usage: $usage)
+            DailyInsights(category: "Creativity", timeOfDay: timeOfDay)
+            //GoalsView(usage: $usage)
         }.padding(.horizontal, 21)
     }
 }
 struct FocusHeader : View {
     let name: String
     var body: some View {
-        GeometryReader {geo in
-            VStack {
-                VStack(spacing: 2) {
-                    Text("hello,")
-                        .font(.custom("SortsMillGoudy-Italic", size: 32))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(getTextColor())
-                    Text("\(name)")
-                        .font(.custom("SortsMillGoudy-Regular", size: 40))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(getTextColor())
+        VStack {
+            VStack(spacing: 2) {
+                Text("hello,")
+                    .font(.custom("SortsMillGoudy-Italic", size: 32))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(getTextColor())
+                Text("\(name)")
+                    .font(.custom("SortsMillGoudy-Regular", size: 40))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(getTextColor())
 
-                }
             }
-                .padding(.top, geo.safeAreaInsets.top + 111)
-                .padding(.horizontal, 21)
+        }.ignoresSafeArea()
+            .padding(.top, 111)
+            .padding(.horizontal, 21)
 
-
-        }
-        .frame(minHeight:272)
     }
 }
 struct StreaksBar : View {
@@ -108,6 +108,96 @@ struct BannerItem: Identifiable, Equatable {
 }
 
 
+struct WeeklyIntentions: View {
+    @Binding var usage: [CategoryUsage]
+    var body: some View {
+        VStack (alignment: .center, spacing: 24){
+            HStack {
+                Image("ellipse").resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 22, height: 22)
+                    .clipped()
+                Text("Weekly Intention").font(.custom("SortsMillGoudy-Regular", size: 20))
+                    .foregroundColor(getTextColor())
+                    .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .topLeading)
+                EditButton(usage: $usage)
+
+            }
+            Text("New week, new canvas. Let's curate your intentions for the week of \(getWeekText())").font(Font.custom("Poppins", size: 14))
+                .foregroundColor(getTextColor())
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            SetIntentionsButton(usage: $usage)
+        }.padding(.horizontal, 12)
+            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .background(Color.white)
+            .cornerRadius(8)
+            .shadow(color: Color(red: 0.58, green: 0.63, blue: 0.34).opacity(0.25), radius: 2, x: 0, y: 3)
+    }
+}
+struct EditButton: View {
+    @Binding var usage: [CategoryUsage]
+    var body: some View {
+        NavigationLink {
+            MyGoalsView(usage: $usage)
+        } label: {
+            Image("edit").frame(width: 20.17158, height: 20.17157)
+        }
+    }
+}
+
+struct IntentionsLandingPage: View {
+    @Binding var usage: [CategoryUsage]
+    var body: some View {
+        VStack {
+            Text("Take a breath.").font(
+                Font.custom("SortsMillGoudy-Regular", size: 48)
+                .italic()
+                )
+                .multilineTextAlignment(.center)
+                .foregroundColor(getTextColor())
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            Text("Let’s curate your intentions for the week. \nNo pressure, just vibes.")
+              .font(Font.custom("Poppins", size: 14))
+              .foregroundColor(getTextColor())
+              .frame(maxWidth: .infinity, alignment: .topLeading)
+            LetsStartButton().frame(maxWidth:.infinity, alignment:.trailing).padding(.top, 114).padding(.trailing, 16)
+        }
+        .frame(maxHeight:.infinity, alignment:.top)
+        .padding(.top, 232).padding(.leading, 16).ignoresSafeArea(edges: .top)
+        .background(
+            Image("Intentions").resizable().aspectRatio(contentMode: .fill).ignoresSafeArea()
+        )
+    }
+}
+struct LetsStartButton: View {
+    var body: some View {
+        NavigationLink {
+            
+        } label: {
+            Text("Let’s Start")
+              .font(Font.custom("SortsMillGoudy-Regular", size: 16))
+              .foregroundColor(getTextColor())
+        }.frame(width: 134, height: 34).padding(.horizontal, 32)
+            .padding(.top, 6)
+            .padding(.bottom, 6)
+            .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
+            .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
+            .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
+            .overlay(
+            RoundedRectangle(cornerRadius: 4)
+            .inset(by: 0.5)
+            .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
+            )
+    }
+}
+
+struct IntentionsEditPage: View {
+    var body: some View {
+        
+        
+    }
+}
 
 struct DailyInsights: View {
     let category: String
@@ -313,7 +403,7 @@ struct BarChartView: View {
         }
     }
 }
-
+/*
 struct GoalsView: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
@@ -329,16 +419,19 @@ struct GoalsView: View {
             .shadow(color: Color(red: 0.58, green: 0.63, blue: 0.34).opacity(0.25), radius: 2, x: 0, y: 3)
     }
 }
-
-struct SetGoalsButton: View {
+*/
+struct SetIntentionsButton: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
         NavigationLink {
-            MyGoalsView(usage: $usage)
+            IntentionsLandingPage(usage: $usage)
         } label: {
-            Text("Set Goals").font(.custom("SortsMillGoudy-Regular", size: 16)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment:.center).padding(.horizontal, 32)
+            Text("Set Intentions").font(.custom("SortsMillGoudy-Regular", size: 16)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment:.center).padding(.horizontal, 32)
                 .padding(.top, 4).foregroundColor(.black)
-        }.background(RoundedRectangle(cornerRadius:4).fill(FocusColors.setGoalsFill))
+        }.frame(width: 161, height: 34).padding(.horizontal, 32)
+            .padding(.top, 4)
+            .padding(.bottom, 6)
+            .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
             .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
             .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
             .overlay(
@@ -346,6 +439,7 @@ struct SetGoalsButton: View {
             .inset(by: 0.5)
             .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
             )
+
     }
 }
 
@@ -377,7 +471,9 @@ struct MyGoalsView: View {
                 }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .navigationBarBackButtonHidden(true)
             }
-        }.overlay(alignment: .bottomTrailing) {
+        }.background(
+            Image("Goals-List-View").resizable().ignoresSafeArea().aspectRatio(contentMode: .fill)
+        ).overlay(alignment: .bottomTrailing) {
             AddGoalButton(usage: $usage)
         }
     }
@@ -386,9 +482,8 @@ struct MyGoalsView: View {
 struct MyGoalsHeader: View {
     var body: some View {
         ZStack {
-            BackButton().frame(maxWidth:.infinity, alignment: .leading).padding(.leading, 13)
             HStack {
-                Text("My Goals").font(.system(size: 32, weight:.medium)).frame(maxWidth:.infinity, alignment:.center)
+                Text("My Goals").font(.custom("SortsMillGoudy-Regular",size: 20)).frame(maxWidth:.infinity, alignment:.center)
             }.frame(maxWidth: .infinity, alignment: .leading).navigationBarBackButtonHidden(true).padding(.leading, 13)
         }
 
@@ -397,7 +492,7 @@ struct MyGoalsHeader: View {
 struct LimitGoals: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
-        Text("Limit").font(.custom("SortsMillGoudy-Regular", size: 32)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 13)
+        Text("Limit").font(.custom("SortsMillGoudy-Regular", size: 20)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 13)
         ForEach(usage.filter {$0.type == .Limit}) {item in
             ProgressComponent(categoryUsage: item).padding(.horizontal, 30).padding(.vertical, 8)
         }
@@ -406,7 +501,7 @@ struct LimitGoals: View {
 struct PrioritizeGoals: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
-        Text("Prioritize").font(.custom("SortsMillGoudy-Regular", size: 32)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 13)
+        Text("Prioritize").font(.custom("SortsMillGoudy-Regular", size: 20)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading, 13)
         ForEach(usage.filter {$0.type == .Prioritize}) {item in
             ProgressComponent(categoryUsage: item).padding(.horizontal, 30).padding(.vertical, 8)
         }
@@ -424,8 +519,10 @@ struct ProgressComponent: View {
                 Text("\(minutesLeft) min left").font(.custom("Poppins", size:14)).frame(maxWidth:.infinity, alignment: .trailing).padding(.trailing,13)
             }
             BarChart(usage:categoryUsage.usage, maxUsage: categoryUsage.maxUsage, height: 30).padding(.horizontal,13)
-        }.frame(width: 343).frame(height:113).background(
-            RoundedRectangle(cornerRadius:16).stroke(Color.black)
+        }.frame(width: 343).frame(height:118).background(
+            RoundedRectangle(cornerRadius:16)
+                .fill(Color(UIColor(red: 1, green: 1, blue: 0.98, alpha: 1)))
+                .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 4)
         )
     }
 }
@@ -712,7 +809,7 @@ enum FocusColors {
         startPoint: .leading,
         endPoint: .trailing
     )
-    static let setGoalsFill = LinearGradient(
+    static let setIntentionsFill = LinearGradient(
         colors: [
             Color(red: 0.96, green: 0.89, blue: 0.87),
             Color(red: 0.96, green: 0.77, blue: 0.5),
@@ -791,6 +888,20 @@ private func getTextColor () -> Color {
     } else {
         return TextColors.restText;
     }
+}
+private func getWeekText() -> String {
+    let calendar = Calendar.current
+    let currDate = Date()
+    
+    guard let interval = calendar.dateInterval(of: .weekOfYear, for: currDate) else {
+        return ""
+    }
+    
+    let start = interval.start.formatted(.dateTime.month(.defaultDigits).day())
+    let end = interval.end.addingTimeInterval(-1).formatted(.dateTime.month(.defaultDigits).day())
+    
+    return "\(start)-\(end)"
+    
 }
 private func getStreakNumColor () -> LinearGradient {
     let hour = Calendar.current.component(.hour, from: Date())
