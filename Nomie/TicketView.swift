@@ -560,6 +560,7 @@ private struct TicketSpotlightCardView: View {
     let card: TicketSpotlightCard
 
     var body: some View {
+        let appImage = appAssetName(for: card.app)
         VStack(alignment: .leading, spacing: 8) {
             Text(card.title)
                 .font(.custom("Poppins-Regular", size: 10))
@@ -567,16 +568,26 @@ private struct TicketSpotlightCardView: View {
             Text(card.app)
                 .font(.custom("SortsMillGoudy-Regular", size: 14))
                 .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
-            Image(systemName: card.icon)
-                .font(.system(size: 28))
-                .foregroundColor(Color(red: 0.18, green: 0.27, blue: 0.40))
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(Color.white.opacity(0.9))
-                        .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
-                )
-                .padding(.vertical, 2)
+            Group {
+                if let appImage {
+                    Image(appImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                } else {
+                    Image(systemName: card.icon)
+                        .font(.system(size: 28))
+                        .foregroundColor(Color(red: 0.18, green: 0.27, blue: 0.40))
+                        .frame(width: 44, height: 44)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(0.9))
+                        )
+                }
+            }
+            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
+            .padding(.vertical, 2)
             Text(card.detail)
                 .font(.custom("Poppins-Regular", size: 10))
                 .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
@@ -598,6 +609,11 @@ private struct TicketSpotlightCardView: View {
         )
         .cornerRadius(12)
     }
+}
+
+private func appAssetName(for app: String) -> String? {
+    let key = app.lowercased().replacingOccurrences(of: " ", with: "")
+    return key.isEmpty ? nil : key
 }
 
 private struct TicketReflectionRow: View {
@@ -813,6 +829,197 @@ private struct TicketStampsBody: View {
                             .offset(x: 45, y: 32)
                     }
                 )
+
+            TicketSummaryCard()
+        }
+    }
+}
+
+private struct TicketSummaryCard: View {
+    var body: some View {
+        ZStack {
+            Image("ticket")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 520)
+
+            VStack(spacing: 0) {
+                ZStack(alignment: .bottomLeading) {
+                    Image("LND")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 350, height: 230)
+                        .scaleEffect(x: -1, y: 1)
+                        .clipped()
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, -240)
+
+                    OutlinedTitle(text: "The Late\nNight Drifter", size: 42, stroke: 2)
+                        .padding(.leading, 34)
+                        .padding(.bottom, 20)
+                }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("TOP APPS")
+                                .font(.custom("AvenirNext-Bold", size: 12))
+                                .foregroundColor(Color.black.opacity(0.7))
+                            SummaryAppRow(rank: "1.", name: "Spotify", time: "4h 12m", imageName: "spotify")
+                            SummaryAppRow(rank: "2.", name: "Instagram", time: "2h 30m", imageName: "instagram")
+                            SummaryAppRow(rank: "3.", name: "Flora", time: "1h 52m", imageName: "flora")
+                        }
+
+                        Spacer()
+
+                        TicketRadarChart()
+                            .frame(width: 120, height: 120)
+                    }
+
+                HStack(spacing: 12) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.black.opacity(0.1))
+                            .frame(height: 54)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+
+                    Rectangle()
+                        .fill(Color.black.opacity(0.18))
+                        .frame(height: 1)
+
+                    HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("01.18.26")
+                            .font(.custom("AvenirNext-Regular", size: 12))
+                            .foregroundColor(Color.black.opacity(0.6))
+                        Image("NOMIE")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 36)
+                    }
+
+                        Spacer()
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("DAILY AVG: 3h 4m")
+                            Text("MY HOUR: 12:00 AM")
+                            Text("STREAK: 7 days")
+                            Text("PICKUPS: 106")
+                        }
+                        .font(.custom("AvenirNext-Regular", size: 11))
+                        .foregroundColor(Color.black.opacity(0.6))
+                    }
+                }
+                .padding(18)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 6)
+    }
+}
+
+private struct OutlinedTitle: View {
+    let text: String
+    let size: CGFloat
+    let stroke: CGFloat
+
+    init(text: String, size: CGFloat = 30, stroke: CGFloat = 1) {
+        self.text = text
+        self.size = size
+        self.stroke = stroke
+    }
+
+    var body: some View {
+        ZStack {
+            Text(text)
+                .font(.custom("SortsMillGoudy-Regular", size: size))
+                .foregroundColor(Color(red: 0.10, green: 0.25, blue: 0.55))
+                .offset(x: stroke, y: 0)
+            Text(text)
+                .font(.custom("SortsMillGoudy-Regular", size: size))
+                .foregroundColor(Color(red: 0.10, green: 0.25, blue: 0.55))
+                .offset(x: -stroke, y: 0)
+            Text(text)
+                .font(.custom("SortsMillGoudy-Regular", size: size))
+                .foregroundColor(Color(red: 0.10, green: 0.25, blue: 0.55))
+                .offset(x: 0, y: stroke)
+            Text(text)
+                .font(.custom("SortsMillGoudy-Regular", size: size))
+                .foregroundColor(Color(red: 0.10, green: 0.25, blue: 0.55))
+                .offset(x: 0, y: -stroke)
+            Text(text)
+                .font(.custom("SortsMillGoudy-Regular", size: size))
+                .foregroundColor(.white)
+        }
+        .multilineTextAlignment(.leading)
+    }
+}
+
+private struct TicketPunches: View {
+    let holeColor: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let count = 7
+            let spacing = width / CGFloat(count)
+            let diameter: CGFloat = 18
+
+            VStack {
+                HStack(spacing: spacing - diameter) {
+                    ForEach(0..<count, id: \.self) { _ in
+                        Circle()
+                            .fill(holeColor)
+                            .frame(width: diameter, height: diameter)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, -diameter / 2)
+
+                Spacer()
+
+                HStack(spacing: spacing - diameter) {
+                    ForEach(0..<count, id: \.self) { _ in
+                        Circle()
+                            .fill(holeColor)
+                            .frame(width: diameter, height: diameter)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, -diameter / 2)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+private struct SummaryAppRow: View {
+    let rank: String
+    let name: String
+    let time: String
+    let imageName: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(rank)
+                .font(.custom("AvenirNext-Regular", size: 12))
+                .foregroundColor(Color.black.opacity(0.6))
+                .frame(width: 18, alignment: .leading)
+            Image(imageName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 32, height: 32)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.custom("AvenirNext-Medium", size: 12))
+                    .foregroundColor(Color.black.opacity(0.75))
+                Text(time)
+                    .font(.custom("AvenirNext-Regular", size: 11))
+                    .foregroundColor(Color.black.opacity(0.6))
+            }
         }
     }
 }

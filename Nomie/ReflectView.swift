@@ -142,7 +142,7 @@ struct ReflectView: View {
                             loggedMoods: $loggedMoods
                         )
                     } label: {
-                        ReflectCard {
+                        ReflectGradientCard {
                             VStack(alignment: .leading, spacing: 16) {
                                 HStack {
                                     Label("Today's prompt", systemImage: "sparkles")
@@ -198,10 +198,11 @@ struct ReflectView: View {
                     NavigationLink {
                         PatternsTrendsView()
                     } label: {
-                        ReflectCard {
-                            VStack(alignment: .leading, spacing: 14) {
+                        ReflectPatternsGradientCard {
+                            VStack(alignment: .leading, spacing: 12) {
                                 TrendsScatterPlot(accentColor: accentColor, inkColor: inkColor)
-                                    .frame(height: 150)
+                                    .frame(height: 128)
+
                                 HStack {
                                     HStack(spacing: 8) {
                                         Image(systemName: "chart.xyaxis.line")
@@ -288,24 +289,23 @@ struct ReflectView: View {
 
 struct ReflectHeader: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .bottom, spacing: 0) {
-                Image("R")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 72, height: 80)
+        HStack(alignment: .top, spacing: -8) {
+            Image("R")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 84, height: 102)
 
+            VStack(alignment: .leading, spacing: 6) {
                 Image("eflect")
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 36)
-                    .padding(.leading, -10)
-                    .padding(.bottom, 12)
-            }
+                    .frame(height: 56)
 
-            Rectangle()
-                .fill(Color.black.opacity(0.35))
-                .frame(height: 1)
+                Rectangle()
+                    .fill(Color.black.opacity(0.35))
+                    .frame(height: 1)
+            }
+            .padding(.top, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -673,6 +673,66 @@ struct ReflectTodayGradientCard<Content: View>: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(Color.white.opacity(0.45), lineWidth: 1)
+            )
+    }
+}
+
+struct ReflectPatternsGradientCard<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.82, green: 0.93, blue: 0.9),
+                                    Color(red: 0.92, green: 0.83, blue: 0.66)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 0.76, green: 0.88, blue: 0.62).opacity(0.6),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: 8,
+                                endRadius: 185
+                            )
+                        )
+
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color(red: 0.96, green: 0.81, blue: 0.58).opacity(0.34),
+                                    .clear
+                                ],
+                                center: .topTrailing,
+                                startRadius: 6,
+                                endRadius: 170
+                            )
+                        )
+                }
+                .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.black.opacity(0.14), lineWidth: 1)
             )
     }
 }
@@ -1191,8 +1251,11 @@ struct PatternsTrendsView: View {
     private let surfaceColor = Color(red: 0.985, green: 0.975, blue: 0.955)
     private let inkColor = Color(red: 0.13, green: 0.13, blue: 0.13)
     private let accentColor = Color(red: 0.16, green: 0.3, blue: 0.22)
+    private let calendar = Calendar.current
     @Environment(\.dismiss) private var dismiss
     @State private var selectedRange: TrendsRange = .past7Days
+    @State private var journalEntries: [ReflectJournalEntry] = []
+    @State private var isGradientBoosted = false
 
     private enum TrendsRange: String, CaseIterable, Identifiable {
         case today = "Today"
@@ -1202,113 +1265,173 @@ struct PatternsTrendsView: View {
         var id: String { rawValue }
     }
 
+    private struct AnalyticsExcerpt: Identifiable {
+        let id: UUID
+        let text: String
+        let weekday: String
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                HStack {
-                    Color.clear.frame(width: 36, height: 36)
-                    Spacer()
+                VStack(spacing: 10) {
+                    Text("Patterns & Trends")
+                        .font(.custom("SortsMillGoudy-Regular", size: 28))
+                        .foregroundStyle(Color.black.opacity(0.92))
 
-                    Text("Patterns &\nTrends")
-                        .font(.custom("Georgia", size: 30))
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(inkColor.opacity(0.9))
-
-                    Spacer()
-
-                    Color.clear.frame(width: 36, height: 36)
+                    Rectangle()
+                        .fill(Color.black.opacity(0.7))
+                        .frame(height: 1)
+                        .padding(.horizontal, 6)
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.top, 4)
 
-                TrendsHeroPill(
-                    title: "Your week at a glance",
-                    subtitle: "Mood vs. app usage",
-                    accentColor: accentColor
-                )
-
-                TrendsSectionTitle(text: "Mood vs. app usage")
-                TrendsSurfaceCard {
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
-                            Text("Inspiration vs. productivity")
-                                .font(.custom("AvenirNext-Medium", size: 12))
-                                .foregroundStyle(inkColor.opacity(0.55))
-                            Spacer()
-                            Button {
-                                selectedRange = nextRange(after: selectedRange)
-                            } label: {
-                                Text(selectedRange.rawValue)
-                                    .font(.custom("AvenirNext-Regular", size: 11))
-                                    .foregroundStyle(inkColor.opacity(0.6))
-                                    .padding(.vertical, 4)
-                                    .padding(.horizontal, 10)
-                                    .background(
-                                        Capsule()
-                                            .fill(accentColor.opacity(0.14))
-                                    )
+                TrendsMoodAnalyticsCard(isGradientBoosted: isGradientBoosted) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Spacer()
+                                Button {
+                                    selectedRange = nextRange(after: selectedRange)
+                                } label: {
+                                    Text(selectedRange.rawValue)
+                                        .font(.custom("AvenirNext-Regular", size: 11))
+                                        .foregroundStyle(inkColor.opacity(0.7))
+                                        .padding(.vertical, 4)
+                                        .padding(.horizontal, 10)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.white.opacity(0.6))
+                                        )
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
+
+                            HStack(spacing: 10) {
+                                Text("Mood vs. app usage")
+                                    .font(.custom("SortsMillGoudy-Regular", size: 20))
+                                    .foregroundStyle(inkColor.opacity(0.95))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.9)
+
+                                Rectangle()
+                                    .fill(Color.black.opacity(0.68))
+                                    .frame(height: 1)
+                            }
                         }
 
-                        TrendsScatterPlot(accentColor: accentColor, inkColor: inkColor)
-                            .frame(height: 190)
+                        HStack(alignment: .center, spacing: 8) {
+                            Text("inspiration level")
+                                .font(.custom("AvenirNext-Regular", size: 13))
+                                .foregroundStyle(inkColor.opacity(0.9))
+                                .rotationEffect(.degrees(-90))
+                                .fixedSize()
+                                .frame(width: 12)
 
-                        HStack {
-                            TrendsMetricBadge(label: "Avg. inspiration", value: "↑ 12%", accentColor: accentColor)
-                            Spacer()
-                            TrendsMetricBadge(label: "App usage", value: "1h 42m", accentColor: accentColor)
+                            VStack(spacing: 8) {
+                                TrendsScatterPlot(
+                                    accentColor: accentColor,
+                                    inkColor: inkColor,
+                                    onPlotTap: {
+                                        withAnimation(.easeInOut(duration: 0.24)) {
+                                            isGradientBoosted.toggle()
+                                        }
+                                    }
+                                )
+                                .frame(height: 320)
+
+                                Text("productivity app usage")
+                                    .font(.custom("AvenirNext-Medium", size: 13))
+                                    .foregroundStyle(inkColor.opacity(0.9))
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "chart.line.uptrend.xyaxis")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(inkColor.opacity(0.85))
+                                Text("Analytics")
+                                    .font(.custom("SortsMillGoudy-Italic", size: 22))
+                                    .foregroundStyle(inkColor.opacity(0.95))
+                            }
+
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("•")
+                                    .font(.custom("AvenirNext-Medium", size: 17))
+                                    .foregroundStyle(inkColor.opacity(0.85))
+                                Text(analyticsSummaryLine)
+                                    .font(.custom("AvenirNext-Regular", size: 14))
+                                    .foregroundStyle(inkColor.opacity(0.86))
+                            }
+
+                            if analyticsExcerpts.isEmpty {
+                                Text(emptyAnalyticsText)
+                                    .font(.custom("AvenirNext-Regular", size: 14))
+                                    .foregroundStyle(inkColor.opacity(0.62))
+                                    .padding(.top, 2)
+                            } else {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ForEach(analyticsExcerpts) { excerpt in
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("\"\(excerpt.text)\"")
+                                                .font(.custom("AvenirNext-Regular", size: 15))
+                                                .foregroundStyle(inkColor.opacity(0.9))
+                                            Text("- \(excerpt.weekday)")
+                                                .font(.custom("AvenirNext-Regular", size: 13))
+                                                .foregroundStyle(inkColor.opacity(0.68))
+                                                .padding(.leading, 8)
+                                        }
+                                    }
+                                }
+                                .padding(.top, 2)
+                            }
                         }
                     }
                 }
 
-                TrendsSectionTitle(text: "Insights")
                 TrendsSurfaceCard {
-                    VStack(alignment: .leading, spacing: 10) {
-                        TrendsInsightRow(
-                            title: "Escape apps correlate with higher stress",
-                            subtitle: "Over 2h of Escape apps usually preceded a tougher day.",
-                            systemImage: "exclamationmark.triangle",
-                            accentColor: accentColor,
-                            inkColor: inkColor
-                        )
-                        Divider().opacity(0.3)
-                        TrendsInsightRow(
-                            title: "Productivity time boosts inspiration",
-                            subtitle: "More focus time often aligns with higher inspiration.",
-                            systemImage: "sparkles",
-                            accentColor: accentColor,
-                            inkColor: inkColor
-                        )
+                    VStack(spacing: 12) {
+                        Text("Insights")
+                            .font(.custom("SortsMillGoudy-Italic", size: 22))
+                            .foregroundStyle(inkColor.opacity(0.9))
+                            .frame(maxWidth: .infinity, alignment: .center)
+
+                        Rectangle()
+                            .fill(Color.black.opacity(0.6))
+                            .frame(height: 1)
+
+                        Text("On days when Escape apps were over 2 hours,\nyour stress levels were higher.")
+                            .font(.custom("SortsMillGoudy-Regular", size: 14))
+                            .foregroundStyle(inkColor.opacity(0.86))
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(1)
+                            .frame(maxWidth: .infinity, alignment: .center)
                     }
+                    .padding(.vertical, 2)
                 }
 
-                TrendsSectionTitle(text: "Suggestions")
-                TrendsSurfaceCard {
+                ReflectPatternsGradientCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Attempt to take intermittent breaks from drifting apps in order to preserve productivity daily.")
-                            .font(.custom("AvenirNext-Regular", size: 14))
-                            .foregroundStyle(inkColor.opacity(0.8))
-                        HStack(spacing: 10) {
-                            Label("Try a 10‑minute reset", systemImage: "timer")
-                                .font(.custom("AvenirNext-Medium", size: 12))
-                                .foregroundStyle(inkColor.opacity(0.7))
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .background(
-                                    Capsule()
-                                        .fill(accentColor.opacity(0.16))
-                                )
-                            Label("Batch notifications", systemImage: "bell.badge")
-                                .font(.custom("AvenirNext-Medium", size: 12))
-                                .foregroundStyle(inkColor.opacity(0.7))
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 12)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.black.opacity(0.06))
-                                )
+                        HStack(spacing: 8) {
+                            Text("Suggestions")
+                                .font(.custom("SortsMillGoudy-Regular", size: 20))
+                                .foregroundStyle(inkColor.opacity(0.95))
+
+                            Rectangle()
+                                .fill(Color.black.opacity(0.58))
+                                .frame(height: 1)
                         }
+
+                        Text("Attempt to take intermittent breaks from\nDrifting apps in order to increase productivity\non a daily basis!")
+                            .font(.custom("AvenirNext-Medium", size: 14))
+                            .foregroundStyle(inkColor.opacity(0.88))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .center)
                     }
+                    .padding(.vertical, 2)
                 }
             }
             .padding(.horizontal, 20)
@@ -1337,6 +1460,9 @@ struct PatternsTrendsView: View {
         }
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
+        .onAppear {
+            journalEntries = normalizeEntries(ReflectJournalStore.loadEntries())
+        }
     }
 
     private func nextRange(after range: TrendsRange) -> TrendsRange {
@@ -1344,6 +1470,123 @@ struct PatternsTrendsView: View {
         guard let index = all.firstIndex(of: range) else { return .past7Days }
         let nextIndex = all.index(after: index)
         return nextIndex == all.endIndex ? all[all.startIndex] : all[nextIndex]
+    }
+
+    private var analyticsSummaryLine: String {
+        switch selectedRange {
+        case .today:
+            return "Today pulls one excerpt from your journal entry."
+        case .past7Days:
+            return "Past 7 days surfaces meaningful excerpts from entries in the last week."
+        case .past30Days:
+            return "Past 30 days surfaces meaningful excerpts from entries in the last month."
+        }
+    }
+
+    private var emptyAnalyticsText: String {
+        switch selectedRange {
+        case .today:
+            return "No journal entry for today yet."
+        case .past7Days:
+            return "No journal entries found in the past 7 days."
+        case .past30Days:
+            return "No journal entries found in the past 30 days."
+        }
+    }
+
+    private var analyticsExcerpts: [AnalyticsExcerpt] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        return filteredEntries.prefix(excerptLimit).map { entry in
+            AnalyticsExcerpt(
+                id: entry.id,
+                text: meaningfulExcerpt(from: entry),
+                weekday: formatter.string(from: entry.date)
+            )
+        }
+    }
+
+    private var excerptLimit: Int {
+        switch selectedRange {
+        case .today:
+            return 1
+        case .past7Days:
+            return 3
+        case .past30Days:
+            return 5
+        }
+    }
+
+    private var filteredEntries: [ReflectJournalEntry] {
+        let today = calendar.startOfDay(for: Date())
+        let contentEntries = journalEntries.filter(hasJournalContent)
+        switch selectedRange {
+        case .today:
+            return contentEntries.filter { calendar.isDate($0.date, inSameDayAs: today) }
+        case .past7Days:
+            guard let start = calendar.date(byAdding: .day, value: -6, to: today) else { return [] }
+            return contentEntries.filter { entry in
+                let day = calendar.startOfDay(for: entry.date)
+                return day >= start && day <= today
+            }
+        case .past30Days:
+            guard let start = calendar.date(byAdding: .day, value: -29, to: today) else { return [] }
+            return contentEntries.filter { entry in
+                let day = calendar.startOfDay(for: entry.date)
+                return day >= start && day <= today
+            }
+        }
+    }
+
+    private func normalizeEntries(_ entries: [ReflectJournalEntry]) -> [ReflectJournalEntry] {
+        var buckets: [ReflectDateKey: ReflectJournalEntry] = [:]
+        for entry in entries.sorted(by: { $0.date > $1.date }) {
+            let key = ReflectDateKey(date: entry.date, calendar: calendar)
+            if buckets[key] == nil {
+                buckets[key] = entry
+            }
+        }
+        return buckets.values.sorted(by: { $0.date > $1.date })
+    }
+
+    private func meaningfulExcerpt(from entry: ReflectJournalEntry) -> String {
+        let journal = entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !journal.isEmpty {
+            return shortenExcerpt(journal)
+        }
+
+        let response = entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !response.isEmpty {
+            return shortenExcerpt(filledPromptString(entry.prompt, with: response))
+        }
+
+        return shortenExcerpt(ReflectJournalPrompt.displayPrompt(entry.prompt))
+    }
+
+    private func hasJournalContent(_ entry: ReflectJournalEntry) -> Bool {
+        let journal = entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let response = entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !journal.isEmpty || !response.isEmpty
+    }
+
+    private func filledPromptString(_ prompt: String, with entry: String) -> String {
+        let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return ReflectJournalPrompt.displayPrompt(prompt) }
+
+        if prompt.contains("...") {
+            return prompt.replacingOccurrences(of: "...", with: trimmed)
+        }
+        if prompt.contains("_____") {
+            return prompt.replacingOccurrences(of: "_____", with: trimmed)
+        }
+        return "\(prompt) \(trimmed)"
+    }
+
+    private func shortenExcerpt(_ text: String, maxLength: Int = 110) -> String {
+        let condensed = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard condensed.count > maxLength else { return condensed }
+        let prefix = condensed.prefix(max(0, maxLength - 1))
+        return "\(prefix)…"
     }
 }
 
@@ -1425,9 +1668,61 @@ struct TrendsSurfaceCard<Content: View>: View {
     }
 }
 
+struct TrendsMoodAnalyticsCard<Content: View>: View {
+    let isGradientBoosted: Bool
+    let content: Content
+
+    init(isGradientBoosted: Bool, @ViewBuilder content: () -> Content) {
+        self.isGradientBoosted = isGradientBoosted
+        self.content = content()
+    }
+
+    var body: some View {
+        let boost = isGradientBoosted ? 1.0 : 0.0
+        content
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.93, green: 0.9, blue: 0.58),
+                                    Color(red: 0.97, green: 0.6, blue: 0.71),
+                                    Color(red: 0.95, green: 0.86, blue: 0.63)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.93, green: 0.9, blue: 0.58).opacity(0.18 * boost),
+                                    Color(red: 0.97, green: 0.6, blue: 0.71).opacity(0.28 * boost),
+                                    Color(red: 0.95, green: 0.86, blue: 0.63).opacity(0.18 * boost)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+    }
+}
+
 struct TrendsScatterPlot: View {
     let accentColor: Color
     let inkColor: Color
+    var onPlotTap: (() -> Void)? = nil
 
     private let points: [CGPoint] = [
         CGPoint(x: 0.15, y: 0.78),
@@ -1473,6 +1768,15 @@ struct TrendsScatterPlot: View {
                             x: point.x * size.width,
                             y: point.y * size.height
                         )
+                }
+
+                if let onPlotTap {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.clear)
+                        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .onTapGesture {
+                            onPlotTap()
+                        }
                 }
             }
         }
@@ -1565,17 +1869,23 @@ struct SelfJournalView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(spacing: 10) {
                     Text("Self-Journal")
-                        .font(.custom("Georgia", size: 24))
-                        .foregroundStyle(inkColor.opacity(0.9))
+                        .font(.custom("SortsMillGoudy-Regular", size: 28))
+                        .foregroundStyle(Color.black.opacity(0.92))
+
+                    Rectangle()
+                        .fill(Color.black.opacity(0.7))
+                        .frame(height: 1)
+                        .padding(.horizontal, 6)
+
                     Text("Today • \(ReflectJournalPrompt.dateLabel(today))")
                         .font(.custom("AvenirNext-Medium", size: 11))
                         .foregroundStyle(inkColor.opacity(0.55))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity)
 
-                ReflectJournalSurfaceCard {
+                ReflectGradientCard {
                     VStack(spacing: 12) {
                         HStack(alignment: .top, spacing: 10) {
                             VStack(alignment: .leading, spacing: 4) {
@@ -2473,8 +2783,6 @@ struct ReflectNotebookView: View {
     let preferredHeight: CGFloat
     @FocusState private var focusedEntryID: UUID?
     private let calendar = Calendar.current
-    @State private var shareItems: [Any] = []
-    @State private var showShareSheet = false
     private let cardCornerRadius: CGFloat = 24
     @State private var searchText: String = ""
     @State private var sortOption: JournalSortOption = .recent
@@ -2539,29 +2847,6 @@ struct ReflectNotebookView: View {
                             .font(.custom("Georgia", size: 22))
                             .foregroundStyle(Color.black.opacity(0.8))
                         Spacer()
-                        Button {
-                            guard let entryToShare = selectedEntry ?? fallbackEntry else { return }
-                            let tagTitles = entryTags[entryToShare.id, default: []]
-                                .sorted(by: { $0.title < $1.title })
-                                .map(\.title)
-                            let shareCard = ShareableJournalCard(entry: entryToShare, tagTitles: tagTitles)
-                            let renderer = ImageRenderer(content: shareCard)
-                            renderer.scale = UIScreen.main.scale
-                            if let image = renderer.uiImage {
-                                shareItems = [image]
-                                showShareSheet = true
-                            }
-                        } label: {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.black.opacity(0.75))
-                                .padding(10)
-                                .background(
-                                    Circle()
-                                        .fill(Color.black.opacity(0.06))
-                                )
-                        }
-                        .buttonStyle(.plain)
                     }
                     .padding(.top, 18)
                     .padding(.horizontal, 24)
@@ -2859,9 +3144,6 @@ struct ReflectNotebookView: View {
             }
         }
         .frame(height: preferredHeight)
-        .sheet(isPresented: $showShareSheet) {
-            ActivityView(activityItems: shareItems)
-        }
     }
 
     private func filteredAndSortedEntries() -> [ReflectJournalEntry] {
@@ -2885,6 +3167,7 @@ struct ReflectNotebookView: View {
             return results.sorted { $0.date > $1.date }
         }
     }
+
 }
 
 struct ReflectMoodDayDisplay: Identifiable {
@@ -2910,68 +3193,6 @@ enum JournalTag: String, CaseIterable, Identifiable, Hashable {
         case .creativity: return Color(red: 0.6, green: 0.33, blue: 0.2)
         case .rest: return Color(red: 0.28, green: 0.44, blue: 0.5)
         }
-    }
-}
-
-struct ActivityView: UIViewControllerRepresentable {
-    let activityItems: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
-struct ShareableJournalCard: View {
-    let entry: ReflectJournalEntry
-    let tagTitles: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("My Journal")
-                .font(.custom("Georgia", size: 22))
-                .foregroundStyle(Color.black.opacity(0.85))
-            Text(ReflectJournalPrompt.dateLabel(entry.date))
-                .font(.custom("AvenirNext-Medium", size: 12))
-                .foregroundStyle(Color.black.opacity(0.6))
-            if entry.promptResponse.isEmpty {
-                Text(ReflectJournalPrompt.displayPrompt(entry.prompt))
-                    .font(.custom("Georgia", size: 18))
-                    .foregroundStyle(Color.black.opacity(0.85))
-            } else {
-                ReflectJournalPrompt.filledPrompt(entry.prompt, with: entry.promptResponse)
-                    .font(.custom("Georgia", size: 18))
-                    .foregroundStyle(Color.black.opacity(0.85))
-            }
-            if !tagTitles.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(tagTitles, id: \.self) { title in
-                        Text(title)
-                            .font(.custom("AvenirNext-Medium", size: 10))
-                            .foregroundStyle(Color.black.opacity(0.7))
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 8)
-                            .background(
-                                Capsule()
-                                    .fill(Color.black.opacity(0.12))
-                            )
-                    }
-                }
-            }
-            if !entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(entry.journalText)
-                    .font(.custom("AvenirNext-Regular", size: 13))
-                    .foregroundStyle(Color.black.opacity(0.8))
-            }
-        }
-        .padding(16)
-        .frame(width: 300, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 6)
-        )
     }
 }
 
