@@ -19,6 +19,7 @@ enum ReflectLandingSection: String, CaseIterable, Identifiable {
 struct ReflectView: View {
     @State private var loggedMoods: [ReflectDateKey: ReflectMoodOption] = [:]
     @State private var journalPrompt = ReflectJournalPrompt.randomPrompt()
+    @State private var journalPromptResponse = ""
     @State private var selectedLandingSection: ReflectLandingSection = .dailyMood
     @State private var activeLandingSection: ReflectLandingSection?
     private let calendar = Calendar.current
@@ -87,6 +88,21 @@ struct ReflectView: View {
         ReflectJournalPrompt.dateLabel(Date())
     }
 
+    private var journalPreviewText: String {
+        let trimmed = journalPromptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ReflectJournalPrompt.displayPrompt(journalPrompt)
+        }
+
+        if journalPrompt.contains("...") {
+            return journalPrompt.replacingOccurrences(of: "...", with: trimmed)
+        }
+        if journalPrompt.contains("_____") {
+            return journalPrompt.replacingOccurrences(of: "_____", with: trimmed)
+        }
+        return "\(journalPrompt) \(trimmed)"
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -139,6 +155,7 @@ struct ReflectView: View {
                         SelfJournalView(
                             initialPrompt: journalPrompt,
                             onPromptChange: { journalPrompt = $0 },
+                            onPromptResponseSave: { journalPromptResponse = $0 },
                             loggedMoods: $loggedMoods
                         )
                     } label: {
@@ -154,7 +171,7 @@ struct ReflectView: View {
                                         .foregroundStyle(inkColor.opacity(0.45))
                                 }
 
-                                Text(ReflectJournalPrompt.displayPrompt(journalPrompt))
+                                Text(journalPreviewText)
                                     .font(.custom("Georgia", size: ReflectJournalPrompt.promptFontSize(for: journalPrompt)))
                                     .foregroundStyle(inkColor.opacity(0.9))
                                     .multilineTextAlignment(.leading)
@@ -262,6 +279,7 @@ struct ReflectView: View {
                     SelfJournalView(
                         initialPrompt: journalPrompt,
                         onPromptChange: { journalPrompt = $0 },
+                        onPromptResponseSave: { journalPromptResponse = $0 },
                         loggedMoods: $loggedMoods
                     )
                 case .patternsTrends:
@@ -279,6 +297,9 @@ struct ReflectView: View {
             let entries = ReflectJournalStore.loadEntries()
             if let todayEntry = entries.first(where: { ReflectDateKey(date: $0.date, calendar: calendar) == todayKey }) {
                 journalPrompt = todayEntry.prompt
+                journalPromptResponse = todayEntry.promptResponse
+            } else {
+                journalPromptResponse = ""
             }
         }
         .onChange(of: loggedMoods) { _ in
@@ -1067,6 +1088,8 @@ struct DailyMoodView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(Color.black.opacity(0.8))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -1454,6 +1477,8 @@ struct PatternsTrendsView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(Color.black.opacity(0.8))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -1853,12 +1878,19 @@ struct SelfJournalView: View {
     private let inkColor = Color(red: 0.14, green: 0.14, blue: 0.14)
     private let accentColor = Color(red: 0.16, green: 0.3, blue: 0.22)
     private let onPromptChange: (String) -> Void
+    private let onPromptResponseSave: (String) -> Void
     @Binding private var loggedMoods: [ReflectDateKey: ReflectMoodOption]
     @Environment(\.dismiss) private var dismiss
 
-    init(initialPrompt: String, onPromptChange: @escaping (String) -> Void, loggedMoods: Binding<[ReflectDateKey: ReflectMoodOption]>) {
+    init(
+        initialPrompt: String,
+        onPromptChange: @escaping (String) -> Void,
+        onPromptResponseSave: @escaping (String) -> Void,
+        loggedMoods: Binding<[ReflectDateKey: ReflectMoodOption]>
+    ) {
         _prompt = State(initialValue: initialPrompt)
         self.onPromptChange = onPromptChange
+        self.onPromptResponseSave = onPromptResponseSave
         _loggedMoods = loggedMoods
     }
 
@@ -1892,7 +1924,7 @@ struct SelfJournalView: View {
                                 Text("Today's prompt")
                                     .font(.custom("AvenirNext-Medium", size: 11))
                                     .foregroundStyle(inkColor.opacity(0.55))
-                                Text(ReflectJournalPrompt.displayPrompt(prompt))
+                                Text(promptPreviewText)
                                     .font(.custom("Georgia", size: max(14, ReflectJournalPrompt.promptFontSize(for: prompt) - 8)))
                                     .foregroundStyle(inkColor.opacity(0.88))
                                     .lineLimit(2)
@@ -2011,12 +2043,13 @@ struct SelfJournalView: View {
                                 let trimmed = promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
                                 guard !trimmed.isEmpty else { return }
                                 upsertEntryForToday(promptResponse: trimmed)
+                                onPromptResponseSave(trimmed)
                                 promptResponse = ""
                                 isEntryFocused = false
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "checkmark")
-                                    Text("Save")
+                                    Text("Done")
                                 }
                                 .font(.custom("AvenirNext-Medium", size: 11))
                                 .foregroundStyle(inkColor.opacity(0.88))
@@ -2083,6 +2116,8 @@ struct SelfJournalView: View {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(Color.black.opacity(0.8))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -2098,9 +2133,10 @@ struct SelfJournalView: View {
             }
             let todayKey = ReflectDateKey(date: today, calendar: calendar)
             if let todayEntry = journalEntries.first(where: { ReflectDateKey(date: $0.date, calendar: calendar) == todayKey }) {
-                promptResponse = todayEntry.promptResponse
+                promptResponse = ""
                 prompt = todayEntry.prompt
                 onPromptChange(todayEntry.prompt)
+                onPromptResponseSave(todayEntry.promptResponse)
                 selectedEntryID = todayEntry.id
             } else {
                 let newEntry = ReflectJournalEntry(
@@ -2110,6 +2146,7 @@ struct SelfJournalView: View {
                     journalText: ""
                 )
                 journalEntries.insert(newEntry, at: 0)
+                onPromptResponseSave("")
                 selectedEntryID = newEntry.id
             }
         }
@@ -2153,6 +2190,25 @@ struct SelfJournalView: View {
         return journalEntries.first(where: { ReflectDateKey(date: $0.date, calendar: calendar) == todayKey })?.id
     }
 
+    private var savedPromptResponseForToday: String {
+        let todayKey = ReflectDateKey(date: today, calendar: calendar)
+        return journalEntries.first(where: { ReflectDateKey(date: $0.date, calendar: calendar) == todayKey })?.promptResponse ?? ""
+    }
+
+    private var promptPreviewText: String {
+        let saved = savedPromptResponseForToday.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !saved.isEmpty {
+            return filledPromptPreview(prompt, with: saved)
+        }
+
+        let draft = promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !draft.isEmpty {
+            return filledPromptPreview(prompt, with: draft)
+        }
+
+        return ReflectJournalPrompt.displayPrompt(prompt)
+    }
+
     private func toggleTag(_ tag: JournalTag, for entryID: UUID) {
         var tags = entryTags[entryID, default: []]
         if tags.contains(tag) {
@@ -2173,6 +2229,21 @@ struct SelfJournalView: View {
                 at: 0
             )
         }
+    }
+
+    private func filledPromptPreview(_ prompt: String, with entry: String) -> String {
+        let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ReflectJournalPrompt.displayPrompt(prompt)
+        }
+
+        if prompt.contains("...") {
+            return prompt.replacingOccurrences(of: "...", with: trimmed)
+        }
+        if prompt.contains("_____") {
+            return prompt.replacingOccurrences(of: "_____", with: trimmed)
+        }
+        return "\(prompt) \(trimmed)"
     }
 
     private var loggedEntryDates: [Date] {
@@ -2391,6 +2462,12 @@ struct ReflectJournalCoverSection: View {
                     openJournalContent
                 } else {
                     coverImage
+                        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                isOpen = true
+                            }
+                        }
                 }
             }
             .frame(maxWidth: .infinity, minHeight: coverPanelHeight, maxHeight: coverPanelHeight, alignment: .top)
@@ -2400,7 +2477,7 @@ struct ReflectJournalCoverSection: View {
                     .stroke(Color.black.opacity(0.08), lineWidth: 1)
             )
             .overlay(alignment: .bottomTrailing) {
-                if isOpen && selectedTab == .today {
+                if isOpen && selectedTab == .today && !isWritingToday {
                     Button {
                         activateWritingMode()
                     } label: {
@@ -2834,7 +2911,7 @@ struct ReflectNotebookView: View {
                                 Image(systemName: "chevron.left")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(Color.black.opacity(0.75))
-                                    .frame(width: 32, height: 32)
+                                    .frame(width: 40, height: 40)
                                     .background(
                                         Circle()
                                             .fill(Color.black.opacity(0.06))
