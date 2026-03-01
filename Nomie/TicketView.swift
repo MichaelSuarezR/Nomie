@@ -4,9 +4,11 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct TicketView: View {
     @State private var storyIndex = 0
+    @State private var selectedSegment: TicketSegment = .weekly
 
     private let storySlides = [
         TicketStoryPage(
@@ -21,35 +23,35 @@ struct TicketView: View {
             showsMiniTicket: true,
             kind: .insights
         ),
-        TicketStoryPage(
-            title: "App Spotlight",
-            subtitle: "“The apps that shifted your attention this week.”",
+            TicketStoryPage(
+                title: "The Late Night Drifter",
+            subtitle: "",
             goalsSummary: "",
             heroImageName: "LND",
             breakdown: [],
             showsMiniTicket: false,
             kind: .appSpotlight
         ),
-        TicketStoryPage(
-            title: "Emotional Landscape",
-            subtitle: "“Your mood and your screen time were linked more than usual.”",
+            TicketStoryPage(
+                title: "The Late Night Drifter",
+            subtitle: "",
             goalsSummary: "",
             heroImageName: "LND",
             breakdown: [],
             showsMiniTicket: false,
             kind: .moodLandscape
         ),
-        TicketStoryPage(
-            title: "Week-Over-Week Patterns",
-            subtitle: "“You shifted more attention toward late evenings.”",
+            TicketStoryPage(
+                title: "The Late Night Drifter",
+            subtitle: "",
             goalsSummary: "",
             heroImageName: "LND",
             breakdown: [],
             showsMiniTicket: false,
             kind: .weekOverWeek
         ),
-        TicketStoryPage(
-            title: "The Intentional Pause",
+            TicketStoryPage(
+                title: "The Late Night Drifter",
             subtitle: "“You reached less often, and chose quiet more.”",
             goalsSummary: "You tracked 7 categories this week. 5 passed your goals.",
             heroImageName: "LND",
@@ -69,31 +71,36 @@ struct TicketView: View {
 
                 ScrollView {
                     VStack(spacing: 16) {
-                        TicketSegmentedHeader()
+                        TicketSegmentedHeader(selectedSegment: $selectedSegment)
 
-                        TicketStoryCard(
-                            page: storySlides[storyIndex],
-                            pageCount: storySlides.count,
-                            currentIndex: storyIndex
-                        )
-                        .overlay(
-                            HStack(spacing: 0) {
-                                Color.clear
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                            storyIndex = max(0, storyIndex - 1)
+                        if selectedSegment == .weekly {
+                            TicketStoryCard(
+                                page: storySlides[storyIndex],
+                                pageCount: storySlides.count,
+                                currentIndex: storyIndex
+                            )
+                            .overlay(
+                                HStack(spacing: 0) {
+                                    Color.clear
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                storyIndex = max(0, storyIndex - 1)
+                                            }
                                         }
-                                    }
-                                Color.clear
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
-                                            storyIndex = min(storySlides.count - 1, storyIndex + 1)
+                                    Color.clear
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                storyIndex = min(storySlides.count - 1, storyIndex + 1)
+                                            }
                                         }
-                                    }
-                            }
-                        )
+                                }
+                            )
+                        } else {
+                            ArchivePlaceholderView()
+                                .padding(.top, 12)
+                        }
                     }
                     .padding(.horizontal, 18)
                     .padding(.bottom, 28)
@@ -110,17 +117,83 @@ struct TicketView: View {
     TicketView()
 }
 
+private enum TicketSegment {
+    case archive
+    case weekly
+}
+
 private struct TicketSegmentedHeader: View {
+    @Binding var selectedSegment: TicketSegment
+
     var body: some View {
-        HStack(spacing: 0) {
-            TicketChip(title: "Archive", isSelected: false)
-                .frame(maxWidth: .infinity, alignment: .center)
-            TicketChip(title: "Week Ticket", isSelected: true)
-                .frame(maxWidth: .infinity, alignment: .center)
+        ZStack {
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.96, green: 0.86, blue: 0.62),
+                            Color(red: 0.98, green: 0.78, blue: 0.66)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 34)
+                .overlay(
+                    Capsule().stroke(Color(red: 0.90, green: 0.82, blue: 0.64), lineWidth: 1)
+                )
+
+            HStack(spacing: 0) {
+                segmentButton(title: "Archive", segment: .archive)
+                segmentButton(title: "Weekly Ticket", segment: .weekly)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 32)
         .padding(.top, 8)
+    }
+
+    private func segmentButton(title: String, segment: TicketSegment) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedSegment = segment
+            }
+        } label: {
+            Text(title)
+                .font(.custom("SortsMillGoudy-Regular", size: 16))
+                .foregroundColor(segment == selectedSegment ? Color(red: 0.24, green: 0.32, blue: 0.20) : Color(red: 0.62, green: 0.56, blue: 0.42))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(segment == selectedSegment ? Color.white : Color.clear)
+                        .padding(2)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct ArchivePlaceholderView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Archive")
+                .font(.custom("SortsMillGoudy-Regular", size: 22))
+                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+            Text("Archive view coming soon.")
+                .font(.custom("Poppins-Regular", size: 13))
+                .foregroundColor(Color.black.opacity(0.6))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.8))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.black.opacity(0.1), lineWidth: 1)
+        )
     }
 }
 
@@ -178,13 +251,7 @@ private struct TicketHeroImage: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Spacer()
-                Text(displayTitle)
-                    .font(.custom("SortsMillGoudy-Regular", size: 32))
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.leading)
-                    .shadow(color: Color.black.opacity(0.95), radius: 16, x: 0, y: 8)
-                    .shadow(color: Color.black.opacity(0.85), radius: 28, x: 0, y: 14)
-                    .shadow(color: Color.black.opacity(0.6), radius: 40, x: 0, y: 20)
+                OutlinedTitle(text: displayTitle, size: 42, stroke: 2)
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
@@ -215,13 +282,15 @@ private struct TicketStoryCard: View {
             TicketStoryProgress(pageCount: pageCount, currentIndex: currentIndex)
                 .padding(.horizontal, 12)
 
-            Text(page.subtitle)
-                .font(.custom("SortsMillGoudy-Italic", size: 16))
-                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 18)
-                .padding(.top, 2)
+            if !page.subtitle.isEmpty {
+                Text(page.subtitle)
+                    .font(.custom("SortsMillGoudy-Italic", size: 16))
+                    .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 2)
+            }
 
             TicketStoryBody(page: page)
                 .padding(.horizontal, 12)
@@ -229,7 +298,7 @@ private struct TicketStoryCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(red: 0.98, green: 0.97, blue: 0.93))
+                .fill(Color.white)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -283,7 +352,7 @@ private struct TicketInsightsBody: View {
                         .fill(Color.white)
                         .frame(width: 22, height: 22)
                         .overlay(
-                            Image("Streak")
+                            Image("active")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 14, height: 14)
@@ -302,18 +371,31 @@ private struct TicketInsightsBody: View {
                 .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
             }
 
-            HStack(spacing: 10) {
-                ForEach(0..<7, id: \.self) { index in
-                    Circle()
-                        .fill(index < 5 ? Color.black.opacity(0.6) : Color.black.opacity(0.25))
-                        .frame(width: 24, height: 24)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 2) {
+                    ForEach(0..<7, id: \.self) { index in
+                        Image(index < 5 ? "active" : "inactive")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 48, height: 48)
+                    }
                 }
-            }
-            .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .center)
 
-            Text("You opened your phone mindfully for 5 days\nstraight.")
-                .font(.custom("Poppins-Regular", size: 13))
-                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+                Text("You opened your phone mindfully for 5 days\nstraight.")
+                    .font(.custom("Poppins-Regular", size: 13))
+                    .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+            }
+            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                    )
+            )
 
             TicketSectionLabel(text: "Pattern Insights:")
             TicketPatternInsightsSection()
@@ -330,14 +412,36 @@ private struct TicketInsightsBody: View {
                     .fontWeight(.bold)
                     .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
             }
+            .padding(.bottom, 2)
+
             Text(page.goalsSummary)
-                .font(.custom("Poppins-Regular", size: 11))
-                .foregroundColor(Color.black.opacity(0.65))
+                .font(.custom("AvenirNext-Regular", size: 14))
+                .foregroundColor(Color.black.opacity(0.7))
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        )
+                )
 
             TicketSectionLabel(text: "Weekly Category Breakdown")
-            ForEach(fullBreakdown) { item in
-                TicketBarRow(label: item.label, value: item.value, progress: item.progress)
+            VStack(spacing: 10) {
+                ForEach(fullBreakdown) { item in
+                    TicketBarRow(label: item.label, value: item.value, progress: item.progress)
+                }
             }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    )
+            )
         }
     }
 }
@@ -370,20 +474,34 @@ private struct TicketAppSpotlightBody: View {
                 }
             }
 
-            HStack {
-                Spacer()
-                Text("Load more")
-                    .font(.custom("SortsMillGoudy-Regular", size: 14))
-                    .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 8)
-                    .background(Color.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(Color.black.opacity(0.12), lineWidth: 1)
-                    )
-                Spacer()
+            TicketSectionLabel(text: "Reflection Highlights:")
+            ReflectionHighlightsCard(
+                rows: [
+                    ReflectionHighlightRow(left: "Instagram", right: "Spotify", count: "47 times", quote: "Needed background sound for scrolling"),
+                    ReflectionHighlightRow(left: "Messages", right: "Instagram", count: "41 times", quote: "Notification led to distraction"),
+                    ReflectionHighlightRow(left: "Email", right: "Messages", count: "33 times", quote: "Quick work check, then real conversation")
+                ]
+            )
+
+            TicketSectionLabel(text: "Attention Timeline")
+            HStack(spacing: 12) {
+                AttentionTimelineCard(
+                    title: "Most Active Day",
+                    day: "Thursday",
+                    date: "Jan 16",
+                    value: "2h 47m total usage",
+                    detail: "Something kept you up. Late-night energy or restless thoughts?"
+                )
+                AttentionTimelineCard(
+                    title: "Quietest Day",
+                    day: "Monday",
+                    date: "Jan 13",
+                    value: "1h 18m total usage",
+                    detail: "You were present elsewhere. The week started grounded."
+                )
             }
+
+            
         }
     }
 }
@@ -421,27 +539,7 @@ private struct TicketStoryProgress: View {
     }
 }
 
-private struct TicketChip: View {
-    let title: String
-    let isSelected: Bool
-
-    var body: some View {
-        Text(title)
-            .font(.custom("SortsMillGoudy-Regular", size: 18))
-            .foregroundColor(Color(red: 0.24, green: 0.32, blue: 0.20))
-            .padding(.horizontal, 26)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color(red: 0.83, green: 0.88, blue: 0.70), lineWidth: 2)
-            )
-            .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
-    }
-}
+// TicketChip removed in favor of TicketSegmentedHeader
 
 private struct TicketSectionLabel: View {
     let text: String
@@ -472,7 +570,7 @@ private struct TicketBullet: View {
                 .frame(width: 6, height: 6)
                 .padding(.top, 6)
             Text(text)
-                .font(.custom("AvenirNext-Regular", size: 12))
+                .font(.custom("AvenirNext-Regular", size: 15))
                 .foregroundColor(Color.black.opacity(0.7))
         }
     }
@@ -563,57 +661,188 @@ private struct TicketSpotlightCardView: View {
         let appImage = appAssetName(for: card.app)
         VStack(alignment: .leading, spacing: 8) {
             Text(card.title)
-                .font(.custom("Poppins-Regular", size: 10))
+                .font(.custom("AvenirNext-DemiBold", size: 13))
                 .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 4)
+
             Text(card.app)
-                .font(.custom("SortsMillGoudy-Regular", size: 14))
+                .font(.custom("SortsMillGoudy-Regular", size: 16))
                 .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+                .frame(maxWidth: .infinity, alignment: .center)
+
             Group {
                 if let appImage {
                     Image(appImage)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .frame(width: 56, height: 56)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     Image(systemName: card.icon)
-                        .font(.system(size: 28))
+                        .font(.system(size: 30))
                         .foregroundColor(Color(red: 0.18, green: 0.27, blue: 0.40))
-                        .frame(width: 44, height: 44)
+                        .frame(width: 56, height: 56)
                         .background(
-                            Circle()
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .fill(Color.white.opacity(0.9))
                         )
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
             .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 3)
             .padding(.vertical, 2)
-            Text(card.detail)
-                .font(.custom("Poppins-Regular", size: 10))
-                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Text(card.value)
-                    .font(.custom("SortsMillGoudy-Regular", size: 12))
+
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(red: 0.88, green: 0.92, blue: 0.74))
+                    .frame(width: 44, height: 52)
+                    .overlay(
+                        Text(card.value)
+                            .font(.custom("AvenirNext-DemiBold", size: 12))
+                            .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+                            .multilineTextAlignment(.center)
+                    )
+
+                Text(card.detail)
+                    .font(.custom("Poppins-Regular", size: 11))
                     .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.top, 2)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.85))
+        .background(Color.white.opacity(0.9))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.black.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
         )
-        .cornerRadius(12)
+        .cornerRadius(14)
     }
 }
 
 private func appAssetName(for app: String) -> String? {
     let key = app.lowercased().replacingOccurrences(of: " ", with: "")
     return key.isEmpty ? nil : key
+}
+
+private struct ReflectionHighlightRow {
+    let left: String
+    let right: String
+    let count: String
+    let quote: String
+}
+
+private struct ReflectionHighlightsCard: View {
+    let rows: [ReflectionHighlightRow]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(rows.indices, id: \.self) { index in
+                let row = rows[index]
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        Text(row.left)
+                            .font(.custom("AvenirNext-Regular", size: 14))
+                            .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(red: 0.92, green: 0.62, blue: 0.45))
+                        Text(row.right)
+                            .font(.custom("AvenirNext-Regular", size: 14))
+                            .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+                        Spacer()
+                        Text("(\(row.count))")
+                            .font(.custom("AvenirNext-Regular", size: 13))
+                            .foregroundColor(Color.black.opacity(0.6))
+                    }
+                    Text("\"\(row.quote)\"")
+                        .font(.custom("AvenirNext-Regular", size: 13))
+                        .foregroundColor(Color.black.opacity(0.7))
+                }
+                if index < rows.count - 1 {
+                    Divider()
+                        .background(Color.black.opacity(0.08))
+                }
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+        )
+    }
+}
+
+private struct AttentionTimelineCard: View {
+    let title: String
+    let day: String
+    let date: String
+    let value: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.custom("AvenirNext-DemiBold", size: 12))
+                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            VStack(spacing: 2) {
+                Text(day)
+                    .font(.custom("AvenirNext-DemiBold", size: 18))
+                    .foregroundColor(Color(red: 0.24, green: 0.32, blue: 0.20))
+                Text(date)
+                    .font(.custom("AvenirNext-Regular", size: 12))
+                    .foregroundColor(Color.black.opacity(0.65))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.98, green: 0.90, blue: 0.60),
+                                Color(red: 0.98, green: 0.80, blue: 0.66),
+                                Color(red: 0.98, green: 0.74, blue: 0.72)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+
+            Text(value)
+                .font(.custom("AvenirNext-Regular", size: 12))
+                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(red: 0.88, green: 0.92, blue: 0.74))
+                )
+
+            Text(detail)
+                .font(.custom("Poppins-Regular", size: 11))
+                .foregroundColor(Color.black.opacity(0.7))
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+        )
+    }
 }
 
 private struct TicketReflectionRow: View {
@@ -642,22 +871,31 @@ private struct TicketPatternInsightsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             TicketRadarChart()
-                .frame(height: 240)
+                .frame(height: 280)
 
-            VStack(alignment: .leading, spacing: 8) {
-                TicketBoldBullet(
-                    title: "This week, your phone was a companion in the quiet hours",
+            VStack(alignment: .leading, spacing: 10) {
+                PatternInsightRow(
+                    lead: "This week, your phone was a companion in the quiet hours",
                     detail: "67% of your attention happened when the world was asleep, suggesting your phone became a tool for processing, reflecting, or unwinding."
                 )
-                TicketBoldBullet(
-                    title: "Attention clustered around late nights and early mornings",
+                PatternInsightRow(
+                    lead: "Attention clustered around late nights and early mornings",
                     detail: "Peak usage between 11 PM and 2 AM. This looks like a week that needed either deeper rest or solitary thinking time."
                 )
-                TicketBoldBullet(
-                    title: "Your rhythm favored depth over distraction",
+                PatternInsightRow(
+                    lead: "Your rhythm favored depth over distraction",
                     detail: "Longer, focused sessions rather than constant checking. The night gave you permission to drift without interruption."
                 )
             }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    )
+            )
         }
     }
 }
@@ -667,23 +905,41 @@ private struct TicketMoodLandscapeBody: View {
         VStack(alignment: .leading, spacing: 14) {
             TicketSectionLabel(text: "Emotional Landscape")
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                TicketMoodCard(title: "Dominant Mood", subtitle: "Contemplative", days: "4 days")
-                TicketMoodCard(title: "Runner-up", subtitle: "Restless", days: "1 days")
-                TicketMoodCard(title: "Bright Zone", subtitle: "Hopeful", days: "4 days")
-                TicketMoodCard(title: "Challenge Zone", subtitle: "Overwhelmed", days: "1 days")
+                TicketMoodCard(title: "Dominant Mood", subtitle: "content", days: "4 days")
+                TicketMoodCard(title: "Runner-up", subtitle: "anxious", days: "1 days")
+                TicketMoodCard(title: "Bright Zone", subtitle: "happy", days: "4 days")
+                TicketMoodCard(title: "Challenge Zone", subtitle: "frustrated", days: "1 days")
             }
 
-            TicketSectionLabel(text: "Mood-to-Usage Correlation")
+            TicketSectionLabel(text: "Mood-to-Usage Correlation:")
             Text("On days you felt contemplative, screen time was 31% higher and clustered late at night. You were searching, processing, or simply keeping yourself company.")
-                .font(.custom("AvenirNext-Regular", size: 12))
+                .font(.custom("AvenirNext-Regular", size: 14))
                 .foregroundColor(Color.black.opacity(0.75))
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        )
+                )
 
-            TicketSectionLabel(text: "Reflection Highlights")
+            TicketSectionLabel(text: "Reflection Highlights:")
             VStack(alignment: .leading, spacing: 6) {
                 TicketBullet(text: "“Couldn't sleep, so I read instead” — Wednesday")
                 TicketBullet(text: "“Finally made progress on that idea” — Thursday")
                 TicketBullet(text: "“Felt more like myself today” — Sunday")
             }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    )
+            )
         }
     }
 }
@@ -706,11 +962,18 @@ private struct TicketMoodCard: View {
                     .background(Color.black.opacity(0.15))
                     .cornerRadius(8)
             }
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.black.opacity(0.25))
-                .frame(width: 60, height: 60)
+            if let moodAsset = moodAssetName(for: subtitle) {
+                Image(moodAsset)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 92, height: 92)
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.black.opacity(0.25))
+                    .frame(width: 60, height: 60)
+            }
             Text(subtitle)
-                .font(.custom("AvenirNext-Medium", size: 12))
+                .font(.custom("AvenirNext-Medium", size: 16))
         }
         .padding(10)
         .frame(maxWidth: .infinity)
@@ -719,45 +982,33 @@ private struct TicketMoodCard: View {
     }
 }
 
+private func moodAssetName(for mood: String) -> String? {
+    let key = mood.lowercased().replacingOccurrences(of: " ", with: "")
+    return key.isEmpty ? nil : key
+}
+
 private struct TicketWeekOverWeekBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            TicketSectionLabel(text: "Week-Over-Week Patterns")
+            TicketSectionLabel(text: "Usage Timing Shift:")
+            TimingShiftCard()
 
-            TicketSectionLabel(text: "Usage Timing Shift")
-            HStack(alignment: .top, spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("LAST WEEK")
-                        .font(.custom("AvenirNext-DemiBold", size: 12))
-                    TicketTimingRow(label: "Morning")
-                    TicketTimingRow(label: "Afternoon")
-                    TicketTimingRow(label: "Evening")
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("THIS WEEK")
-                        .font(.custom("AvenirNext-DemiBold", size: 12))
-                    TicketTimingRow(label: "Morning")
-                    TicketTimingRow(label: "Afternoon")
-                    TicketTimingRow(label: "Evening")
-                }
-            }
+            TicketSectionLabel(text: "Category Shift:")
+            CategoryShiftCard()
 
-            Text("You shifted 38% more attention toward late evening and night hours.")
-                .font(.custom("AvenirNext-Regular", size: 12))
-                .foregroundColor(Color.black.opacity(0.75))
+            TicketSectionLabel(text: "New Behaviors Detected:")
+            BulletCard(items: [
+                "Started reading before bed 5 nights this week (new pattern!)",
+                "Music usage increased by 68% — sound became important",
+                "First time hitting “Do Not Disturb” consistently after 11 PM"
+            ])
 
-            TicketSectionLabel(text: "Category Shift")
-            TicketShiftRow(label: "Entertainment", value: "1h 12m")
-            TicketShiftRow(label: "Social Connection", value: "47m")
-            TicketShiftRow(label: "Learning & Growth", value: "34m")
-
-            TicketSectionLabel(text: "New Behaviors Detected")
-            TicketBullet(text: "Started reading before bed 5 nights this week (new pattern!)")
-            TicketBullet(text: "Music usage increased by 68% — sound became important")
-            TicketBullet(text: "First time hitting “Do Not Disturb” consistently after 11 PM")
-
-            TicketSectionLabel(text: "What Stayed Consistent")
-            TicketBullet(text: "Morning screen time remains low (well done!)")
+            TicketSectionLabel(text: "What Stayed Consistent:")
+            BulletCard(items: [
+                "Morning screen time remains low (well done!)",
+                "Productivity apps still used primarily 2–5 PM",
+                "Weekend digital detox pattern continued"
+            ])
         }
     }
 }
@@ -768,10 +1019,22 @@ private struct TicketTimingRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(label)
-                .font(.custom("AvenirNext-Regular", size: 12))
+                .font(.custom("AvenirNext-Regular", size: 14))
+                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.black.opacity(0.5))
-                .frame(width: 90, height: 8)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.96, green: 0.79, blue: 0.62),
+                            Color(red: 0.90, green: 0.70, blue: 0.52),
+                            Color(red: 0.86, green: 0.90, blue: 0.70)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 8)
+                .frame(maxWidth: 170)
         }
     }
 }
@@ -783,14 +1046,100 @@ private struct TicketShiftRow: View {
     var body: some View {
         HStack {
             Text(label)
-                .font(.custom("AvenirNext-Medium", size: 12))
+                .font(.custom("AvenirNext-DemiBold", size: 15))
+                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
             Spacer()
             Image(systemName: "arrow.up")
                 .font(.system(size: 12))
-                .foregroundColor(Color.black.opacity(0.7))
+                .foregroundColor(Color(red: 0.92, green: 0.62, blue: 0.45))
             Text(value)
-                .font(.custom("AvenirNext-Regular", size: 12))
+                .font(.custom("AvenirNext-Regular", size: 14))
+                .foregroundColor(Color.black.opacity(0.6))
         }
+    }
+}
+
+private struct TimingShiftCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("LAST WEEK")
+                .font(.custom("AvenirNext-DemiBold", size: 13))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+
+            VStack(alignment: .leading, spacing: 10) {
+                TicketTimingRow(label: "Morning")
+                TicketTimingRow(label: "Afternoon")
+                TicketTimingRow(label: "Evening")
+            }
+
+            Divider()
+                .background(Color.black.opacity(0.08))
+
+            Text("THIS WEEK")
+                .font(.custom("AvenirNext-DemiBold", size: 13))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .foregroundColor(Color(red: 0.32, green: 0.41, blue: 0.28))
+
+            VStack(alignment: .leading, spacing: 10) {
+                TicketTimingRow(label: "Morning")
+                TicketTimingRow(label: "Afternoon")
+                TicketTimingRow(label: "Evening")
+            }
+
+            Text("You shifted **38% more attention** toward late evening and night hours.")
+                .font(.custom("AvenirNext-Regular", size: 14))
+                .foregroundColor(Color.black.opacity(0.75))
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+        )
+    }
+}
+
+private struct CategoryShiftCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TicketShiftRow(label: "Entertainment", value: "1h 12m")
+            TicketShiftRow(label: "Social Connection", value: "47m")
+            TicketShiftRow(label: "Learning & Growth", value: "34m")
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+        )
+    }
+}
+
+private struct BulletCard: View {
+    let items: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(items, id: \.self) { item in
+                TicketBullet(text: item)
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+        )
     }
 }
 
@@ -836,60 +1185,119 @@ private struct TicketStampsBody: View {
 }
 
 private struct TicketSummaryCard: View {
+    @State private var shareImage: UIImage?
+    @State private var showShareSheet = false
+
+    var body: some View {
+        TicketSummaryCardShell {
+            TicketSummaryCardContent(
+                showsActions: true,
+                onSave: saveSnapshot,
+                onShare: shareSnapshot
+            )
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let shareImage {
+                ShareSheet(items: [shareImage])
+            }
+        }
+    }
+
+    private func saveSnapshot() {
+        guard let image = makeSnapshot() else { return }
+        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+    }
+
+    private func shareSnapshot() {
+        shareImage = makeSnapshot()
+        showShareSheet = shareImage != nil
+    }
+
+    private func makeSnapshot() -> UIImage? {
+        let snapshotView = TicketSummaryCardShell {
+            TicketSummaryCardContent(showsActions: false, onSave: {}, onShare: {})
+        }
+        let renderer = ImageRenderer(content: snapshotView)
+        renderer.scale = UIScreen.main.scale
+        return renderer.uiImage
+    }
+}
+
+private struct TicketSummaryCardShell<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
     var body: some View {
         ZStack {
             Image("ticket")
                 .resizable()
                 .scaledToFit()
-                .frame(height: 520)
+                .frame(height: 920)
+                .offset(y: -50)
 
-            VStack(spacing: 0) {
-                ZStack(alignment: .bottomLeading) {
-                    Image("LND")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 350, height: 230)
-                        .scaleEffect(x: -1, y: 1)
-                        .clipped()
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, -240)
+            content
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 6)
+    }
+}
 
-                    OutlinedTitle(text: "The Late\nNight Drifter", size: 42, stroke: 2)
-                        .padding(.leading, 34)
-                        .padding(.bottom, 20)
-                }
+private struct TicketSummaryCardContent: View {
+    let showsActions: Bool
+    let onSave: () -> Void
+    let onShare: () -> Void
 
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("TOP APPS")
-                                .font(.custom("AvenirNext-Bold", size: 12))
-                                .foregroundColor(Color.black.opacity(0.7))
-                            SummaryAppRow(rank: "1.", name: "Spotify", time: "4h 12m", imageName: "spotify")
-                            SummaryAppRow(rank: "2.", name: "Instagram", time: "2h 30m", imageName: "instagram")
-                            SummaryAppRow(rank: "3.", name: "Flora", time: "1h 52m", imageName: "flora")
-                        }
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack(alignment: .bottomLeading) {
+                Image("LND")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 350, height: 230)
+                    .scaleEffect(x: -1, y: 1)
+                    .clipped()
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, -200)
 
-                        Spacer()
+                OutlinedTitle(text: "The Late\nNight Drifter", size: 42, stroke: 2)
+                    .padding(.leading, 34)
+                    .padding(.bottom, 20)
+            }
 
-                        TicketRadarChart()
-                            .frame(width: 120, height: 120)
+            VStack(alignment: .leading, spacing: 26) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("TOP APPS")
+                            .font(.custom("AvenirNext-Bold", size: 18))
+                            .foregroundColor(Color.black.opacity(0.7))
+                        SummaryAppRow(rank: "1.", name: "Spotify", time: "4h 12m", imageName: "spotify", iconSize: 48, textSize: 16, timeSize: 14)
+                        SummaryAppRow(rank: "2.", name: "Instagram", time: "2h 30m", imageName: "instagram", iconSize: 48, textSize: 16, timeSize: 14)
+                        SummaryAppRow(rank: "3.", name: "Flora", time: "1h 52m", imageName: "flora", iconSize: 48, textSize: 16, timeSize: 14)
                     }
 
-                HStack(spacing: 12) {
+                    Spacer()
+
+                    TicketRadarChart()
+                        .frame(width: 160, height: 160)
+                }
+
+                HStack(spacing: 18) {
                     ForEach(0..<4, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(Color.black.opacity(0.1))
-                            .frame(height: 54)
+                            .frame(height: 76)
                             .frame(maxWidth: .infinity)
                     }
                 }
 
-                    Rectangle()
-                        .fill(Color.black.opacity(0.18))
-                        .frame(height: 1)
+                DashedDivider()
+                    .padding(.horizontal, 12)
+                    .padding(.top, 18)
 
-                    HStack(alignment: .top) {
+                HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("01.18.26")
                             .font(.custom("AvenirNext-Regular", size: 12))
@@ -897,26 +1305,33 @@ private struct TicketSummaryCard: View {
                         Image("NOMIE")
                             .resizable()
                             .scaledToFit()
-                            .frame(height: 36)
+                            .frame(height: 70)
                     }
 
-                        Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("DAILY AVG: 3h 4m")
+                        Text("MY HOUR: 12:00 AM")
+                        Text("STREAK: 7 days")
+                        Text("PICKUPS: 106")
+                    }
+                    .font(.custom("AvenirNext-Regular", size: 11))
+                    .foregroundColor(Color.black.opacity(0.6))
+                    .padding(.leading, 16)
+                    .padding(.top, 4)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("DAILY AVG: 3h 4m")
-                            Text("MY HOUR: 12:00 AM")
-                            Text("STREAK: 7 days")
-                            Text("PICKUPS: 106")
+                    Spacer()
+
+                    if showsActions {
+                        VStack(spacing: 10) {
+                            TicketActionButton(systemImage: "square.and.arrow.down", action: onSave)
+                            TicketActionButton(systemImage: "square.and.arrow.up", action: onShare)
                         }
-                        .font(.custom("AvenirNext-Regular", size: 11))
-                        .foregroundColor(Color.black.opacity(0.6))
                     }
                 }
-                .padding(18)
+                .padding(.top, 18)
             }
+            .padding(18)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 6)
     }
 }
 
@@ -1000,27 +1415,77 @@ private struct SummaryAppRow: View {
     let name: String
     let time: String
     let imageName: String
+    let iconSize: CGFloat
+    let textSize: CGFloat
+    let timeSize: CGFloat
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Text(rank)
-                .font(.custom("AvenirNext-Regular", size: 12))
+                .font(.custom("AvenirNext-Regular", size: textSize))
                 .foregroundColor(Color.black.opacity(0.6))
-                .frame(width: 18, alignment: .leading)
+                .frame(width: 20, alignment: .leading)
             Image(imageName)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 32, height: 32)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .frame(width: iconSize, height: iconSize)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.custom("AvenirNext-Medium", size: 12))
+                    .font(.custom("AvenirNext-Medium", size: textSize))
                     .foregroundColor(Color.black.opacity(0.75))
                 Text(time)
-                    .font(.custom("AvenirNext-Regular", size: 11))
+                    .font(.custom("AvenirNext-Regular", size: timeSize))
                     .foregroundColor(Color.black.opacity(0.6))
             }
         }
+    }
+}
+
+private struct TicketActionButton: View {
+    let systemImage: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.black.opacity(0.2), lineWidth: 1)
+                    )
+                    .frame(width: 34, height: 34)
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(Color.black.opacity(0.7))
+            }
+            .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+private struct DashedDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(height: 2)
+            .overlay(
+                Rectangle()
+                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [6, 6]))
+                    .foregroundColor(Color.black.opacity(0.4))
+            )
     }
 }
 private struct TicketBoldBullet: View {
@@ -1040,15 +1505,40 @@ private struct TicketBoldBullet: View {
     }
 }
 
+private struct PatternInsightRow: View {
+    let lead: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("•")
+                .font(.custom("AvenirNext-Medium", size: 15))
+                .foregroundColor(Color.black.opacity(0.5))
+                .padding(.top, 2)
+
+            (
+                Text(lead + " — ")
+                    .font(.custom("AvenirNext-DemiBold", size: 14))
+                    .foregroundColor(Color(red: 0.24, green: 0.32, blue: 0.20))
+                +
+                Text(detail)
+                    .font(.custom("AvenirNext-Regular", size: 14))
+                    .foregroundColor(Color.black.opacity(0.7))
+            )
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
 private struct TicketRadarChart: View {
     private let labels = ["drifting", "connection", "creativity", "entertainment", "learning", "productivity"]
-    private let seriesA: [CGFloat] = [0.85, 0.45, 0.35, 0.7, 0.25, 0.3]
+    private let seriesA: [CGFloat] = [0.35, 0.5, 0.45, 0.25, 0.75, 0.8]
 
     var body: some View {
         GeometryReader { proxy in
             let size = min(proxy.size.width, proxy.size.height)
             let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-            let radius = size * 0.35
+            let radius = size * 0.38
 
             ZStack {
                 TicketRadarGrid(center: center, radius: radius)
@@ -1057,15 +1547,25 @@ private struct TicketRadarChart: View {
                     .stroke(Color.red.opacity(0.75), lineWidth: 1.5)
                     .background(
                         TicketRadarPolygon(values: seriesA, center: center, radius: radius)
-                            .fill(Color.red.opacity(0.18))
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.98, green: 0.42, blue: 0.35).opacity(0.55),
+                                        Color(red: 0.99, green: 0.68, blue: 0.32).opacity(0.45),
+                                        Color(red: 0.98, green: 0.88, blue: 0.55).opacity(0.35)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                     )
 
                 ForEach(labels.indices, id: \.self) { index in
                     let angle = angleForIndex(index)
-                    let labelPoint = point(center: center, radius: radius * 1.15, angle: angle)
+                    let labelPoint = point(center: center, radius: radius * 1.3, angle: angle)
                     Text(labels[index])
-                        .font(.custom("AvenirNext-Regular", size: 11))
-                        .foregroundColor(Color.black.opacity(0.7))
+                        .font(.custom("SortsMillGoudy-Regular", size: 14))
+                        .foregroundColor(Color(red: 0.38, green: 0.48, blue: 0.30))
                         .position(labelPoint)
                 }
             }
