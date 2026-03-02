@@ -3560,15 +3560,15 @@ struct ReflectMoodOption: Identifiable, Equatable, Hashable {
     let assetName: String
 
     static let moods: [ReflectMoodOption] = [
-        .init(name: "Happy", assetName: "Illustration294 1"),
-        .init(name: "Fine", assetName: "Illustration295 1"),
-        .init(name: "Frustrated", assetName: "Illustration296 1"),
-        .init(name: "Anxious", assetName: "Illustration297 1"),
-        .init(name: "Excited", assetName: "Illustration298 1"),
-        .init(name: "Sad", assetName: "Illustration299 1"),
-        .init(name: "Tired", assetName: "Illustration300 1"),
-        .init(name: "Bored", assetName: "Illustration301 1"),
-        .init(name: "Content", assetName: "Illustration302 1")
+        .init(name: "Happy", assetName: "happy"),
+        .init(name: "Fine", assetName: "fine"),
+        .init(name: "Frustrated", assetName: "frustrated"),
+        .init(name: "Anxious", assetName: "anxious"),
+        .init(name: "Excited", assetName: "excited"),
+        .init(name: "Sad", assetName: "sad"),
+        .init(name: "Tired", assetName: "tired"),
+        .init(name: "Bored", assetName: "bored"),
+        .init(name: "Content", assetName: "content")
     ]
 
     static func fromName(_ name: String) -> ReflectMoodOption? {
