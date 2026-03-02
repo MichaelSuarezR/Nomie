@@ -10,12 +10,48 @@ private let reflectLandingMoodCardHeight: CGFloat = 228
 
 private struct ReflectTabBackground: View {
     var body: some View {
-        Image("sunset")
-            .resizable()
-            .ignoresSafeArea()
-            .aspectRatio(contentMode: .fill)
-            .offset(x: 300)
-            .scaleEffect(x: -1, y: 1)
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: Color(red: 0.98, green: 0.94, blue: 0.80), location: 0.0),
+                    .init(color: Color(red: 0.95, green: 0.97, blue: 0.90), location: 0.56),
+                    .init(color: Color(red: 0.99, green: 0.93, blue: 0.88), location: 1.0)
+                ],
+                startPoint: .topLeading,
+                endPoint: .topTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(red: 0.98, green: 0.83, blue: 0.67).opacity(0.42),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.66, y: 0.72),
+                startRadius: 24,
+                endRadius: 380
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(red: 0.97, green: 0.74, blue: 0.66).opacity(0.28),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.94, y: 0.70),
+                startRadius: 18,
+                endRadius: 260
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(red: 0.98, green: 0.90, blue: 0.66).opacity(0.30),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.12, y: 0.04),
+                startRadius: 12,
+                endRadius: 220
+            )
+        }
+        .ignoresSafeArea()
     }
 }
 
@@ -34,6 +70,10 @@ struct ReflectView: View {
     @State private var journalPromptResponse = ""
     @State private var selectedLandingSection: ReflectLandingSection = .overview
     @State private var moodLevelsRefreshTick: Int = 0
+    @State private var isLandingMoodOrbitDragging = false
+    @State private var isLandingJournalCoverEditing = false
+    @State private var journalDeepLinkDate: Date? = nil
+    @State private var journalDeepLinkToken: UUID? = nil
     private let topScrollID = "reflect.top.scroll.id"
     private let calendar = Calendar.current
     private let tabBarColor = Color(red: 0.97, green: 0.97, blue: 0.97)
@@ -49,6 +89,25 @@ struct ReflectView: View {
         return moodForDate(yesterday)
     }
 
+    private var yesterdayDate: Date? {
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) else { return nil }
+        return calendar.startOfDay(for: yesterday)
+    }
+
+    private var yesterdayJournalEntry: ReflectJournalEntry? {
+        guard let yesterdayDate else { return nil }
+        return ReflectJournalStore.loadEntries()
+            .filter { calendar.isDate($0.date, inSameDayAs: yesterdayDate) }
+            .sorted { $0.date > $1.date }
+            .first(where: hasJournalContent)
+    }
+
+    private var yesterdayJournalExcerpt: String {
+        guard let entry = yesterdayJournalEntry else { return "No journal entry from yesterday." }
+        let text = journalPreviewText(for: entry)
+        return shortenedOverviewExcerpt(text, maxLength: 145)
+    }
+
     private var moodStreakDays: Int {
         guard let latestLoggedDate = latestLoggedMoodDate else { return 0 }
         let today = calendar.startOfDay(for: Date())
@@ -57,14 +116,6 @@ struct ReflectView: View {
         // Keep streak on the first unlogged day, then reset if another day passes.
         guard daysSinceLatest <= 1 else { return 0 }
         return streakEnding(on: latestLoggedDate)
-    }
-
-    private func yesterdayReflectionPrompt(for mood: ReflectMoodOption) -> String {
-        let moodName = mood.name.lowercased()
-        let emotionNoun = mood.reflectionEmotionNoun
-        return """
-        What made you \(moodName) yesterday? What are some ways you expressed and felt your \(emotionNoun)? How does this relate to your goals and productivity yesterday?
-        """
     }
 
     private var latestLoggedMoodDate: Date? {
@@ -96,19 +147,37 @@ struct ReflectView: View {
         return calendar.date(from: components).map { calendar.startOfDay(for: $0) }
     }
 
-    private var journalPreviewText: String {
-        let trimmed = journalPromptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return ReflectJournalPrompt.displayPrompt(journalPrompt)
-        }
+    private func hasJournalContent(_ entry: ReflectJournalEntry) -> Bool {
+        !entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
-        if journalPrompt.contains("...") {
-            return journalPrompt.replacingOccurrences(of: "...", with: trimmed)
+    private func journalPreviewText(for entry: ReflectJournalEntry) -> String {
+        let journalBody = entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !journalBody.isEmpty { return journalBody }
+
+        let response = entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !response.isEmpty {
+            return ReflectJournalPrompt.filledPromptString(entry.prompt, with: response)
         }
-        if journalPrompt.contains("_____") {
-            return journalPrompt.replacingOccurrences(of: "_____", with: trimmed)
-        }
-        return "\(journalPrompt) \(trimmed)"
+        return ReflectJournalPrompt.displayPrompt(entry.prompt)
+    }
+
+    private func shortenedOverviewExcerpt(_ text: String, maxLength: Int) -> String {
+        let condensed = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        guard condensed.count > maxLength else { return condensed }
+        return "\(condensed.prefix(maxLength))..."
+    }
+
+    private func openYesterdayJournalEntry() {
+        guard let yesterdayDate else { return }
+        journalDeepLinkDate = yesterdayDate
+        journalDeepLinkToken = UUID()
+        selectedLandingSection = .journal
+    }
+
+    private var journalPreviewText: String {
+        ReflectJournalPrompt.filledPromptString(journalPrompt, with: journalPromptResponse)
     }
 
     private var past7DayMoodScores: [CGFloat] {
@@ -155,7 +224,7 @@ struct ReflectView: View {
                         .frame(height: 0)
                         .id(topScrollID)
 
-                    VStack(spacing: 18) {
+                    VStack(spacing: 20) {
                         ReflectHeader()
 
                         VStack(spacing: 0) {
@@ -164,12 +233,12 @@ struct ReflectView: View {
                             }
                             .padding(.horizontal, 0)
                             .padding(.bottom, -10)
-                            .zIndex(1)
+                            .zIndex(0)
 
                             landingPanelContent
-                            .padding(.horizontal, 12)
-                            .padding(.top, 22)
-                            .padding(.bottom, 16)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 28)
+                            .padding(.bottom, 24)
                             .background(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     .fill(Color.white.opacity(0.96))
@@ -179,13 +248,15 @@ struct ReflectView: View {
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     .stroke(Color(red: 0.9, green: 0.89, blue: 0.8), lineWidth: 1)
                             )
+                            .zIndex(1)
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 10)
                     .padding(.bottom, 24)
                     .padding(.top, 8)
                     .nomieTabBarContentPadding()
                 }
+                .scrollDisabled(selectedLandingSection == .dailyMood && isLandingMoodOrbitDragging)
                 .background(ReflectTabBackground())
                 .onChange(of: selectedLandingSection) { _ in
                     withAnimation(.easeInOut(duration: 0.28)) {
@@ -232,7 +303,7 @@ struct ReflectView: View {
     }
 
     private var overviewPanelContent: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             dailyMoodOverviewSection
             journalOverviewSection
             patternsOverviewSection
@@ -240,9 +311,9 @@ struct ReflectView: View {
     }
 
     private var dailyMoodOverviewSection: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 22) {
             ReflectSectionTitle(text: "Daily Mood", leadingAssetName: "planet2")
-            HStack(alignment: .top, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
                 Button {
                     selectedLandingSection = .dailyMood
                 } label: {
@@ -256,23 +327,44 @@ struct ReflectView: View {
             }
 
             if let yesterdayMood {
-                HStack(alignment: .top, spacing: 14) {
+                let reflectionRowHeight: CGFloat = 214
+                HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .center, spacing: 10) {
                         Text("Reflect on yesterday:")
                             .font(.custom("SortsMillGoudy-Italic", size: 22))
                             .foregroundStyle(inkColor.opacity(0.92))
                             .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .center)
 
-                        Text(yesterdayReflectionPrompt(for: yesterdayMood))
+                        Text(yesterdayJournalExcerpt)
                             .font(.custom("Poppins-Regular", size: 14))
                             .foregroundStyle(inkColor.opacity(0.88))
                             .lineSpacing(2)
                             .multilineTextAlignment(.center)
+                            .lineLimit(6)
+                            .truncationMode(.tail)
                             .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
+                            .frame(maxWidth: .infinity, alignment: .center)
 
-                    ReflectYesterdayMoodSummary(mood: yesterdayMood)
+                        Spacer(minLength: 0)
+
+                        Button {
+                            openYesterdayJournalEntry()
+                        } label: {
+                            ReflectOutlineActionButton(title: "See More")
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .disabled(yesterdayJournalEntry == nil)
+                        .opacity(yesterdayJournalEntry == nil ? 0.45 : 1)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: reflectionRowHeight, maxHeight: reflectionRowHeight, alignment: .top)
+
+                    ReflectYesterdayMoodSummary(
+                        mood: yesterdayMood,
+                        alignMoodLabelToBottom: true,
+                        minHeight: reflectionRowHeight
+                    )
                         .frame(maxWidth: .infinity, alignment: .top)
                 }
             }
@@ -282,12 +374,13 @@ struct ReflectView: View {
     private var dailyMoodTabContent: some View {
         DailyMoodView(
             loggedMoods: $loggedMoods,
-            isEmbeddedInLanding: true
+            isEmbeddedInLanding: true,
+            externalIsMoodOrbitDragging: $isLandingMoodOrbitDragging
         )
     }
 
     private var journalOverviewSection: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 22) {
             ReflectSectionTitle(text: "Journal", leadingAssetName: "planet2")
             Button {
                 selectedLandingSection = .journal
@@ -305,7 +398,8 @@ struct ReflectView: View {
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
                             .minimumScaleFactor(0.78)
-                            .frame(maxWidth: .infinity, alignment: .center)
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, minHeight: 50, maxHeight: 50, alignment: .center)
                             .padding(.vertical, 2)
 
                         ReflectActionButton(title: "Log Journal")
@@ -322,12 +416,15 @@ struct ReflectView: View {
             initialPrompt: journalPrompt,
             onPromptChange: { journalPrompt = $0 },
             onPromptResponseSave: { journalPromptResponse = $0 },
-            isEmbeddedInLanding: true
+            isEmbeddedInLanding: true,
+            externalIsJournalCoverEditing: $isLandingJournalCoverEditing,
+            externalPastEntriesJumpDate: $journalDeepLinkDate,
+            externalPastEntriesJumpToken: $journalDeepLinkToken
         )
     }
 
     private var patternsOverviewSection: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 22) {
             ReflectSectionTitle(text: "Patterns & Trends", leadingAssetName: "planet2")
             VStack(spacing: 14) {
                 ReflectPatternsPreviewChart(scores: past7DayMoodScores)
@@ -406,8 +503,13 @@ struct ReflectLandingTabs: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
             }
         }
+        .padding(.leading, -3)
+        .padding(.trailing, 3)
+        .padding(.top, 2)
+        .padding(.bottom, 2)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -419,17 +521,18 @@ struct ReflectLandingTabChip: View {
     var body: some View {
         Text(title)
             .font(.custom("Poppins-Regular", size: 11))
-            .foregroundStyle(Color.black.opacity(0.84))
+            .foregroundStyle(Color(red: 0.2, green: 0.28, blue: 0.22).opacity(0.96))
             .lineLimit(1)
-            .minimumScaleFactor(0.82)
-            .padding(.vertical, 9)
-            .padding(.horizontal, 8)
-            .frame(minHeight: 42)
+            .minimumScaleFactor(0.58)
+            .allowsTightening(true)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 39)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(
                         isSelected
-                        ? AnyShapeStyle(Color.white)
+                        ? AnyShapeStyle(Color.white.opacity(0.98))
                         : AnyShapeStyle(
                             LinearGradient(
                                 stops: [
@@ -442,11 +545,27 @@ struct ReflectLandingTabChip: View {
                             )
                         )
                     )
-                    .shadow(color: Color.black.opacity(0.08), radius: 5, x: 0, y: 3)
+                    .shadow(
+                        color: isSelected ? Color.black.opacity(0.08) : Color.black.opacity(0.06),
+                        radius: isSelected ? 2.8 : 2.2,
+                        x: 0,
+                        y: 0.8
+                    )
+                    .shadow(
+                        color: Color.white.opacity(isSelected ? 0.55 : 0.25),
+                        radius: 0.9,
+                        x: 0,
+                        y: -0.8
+                    )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        isSelected
+                        ? Color(red: 0.86, green: 0.88, blue: 0.79).opacity(0.9)
+                        : Color.white.opacity(0.72),
+                        lineWidth: 1
+                    )
             )
     }
 }
@@ -550,23 +669,15 @@ private struct ReflectPatternsPreviewChart: View {
 
                     ZStack {
                         Rectangle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.95, green: 0.94, blue: 0.82),
-                                        Color(red: 0.83, green: 0.94, blue: 0.92)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
+                            .fill(Color.white)
 
                         areaPath(from: points, in: size)
                             .fill(
                                 LinearGradient(
-                                    colors: [
-                                        Color(red: 0.97, green: 0.84, blue: 0.63).opacity(0.74),
-                                        Color(red: 0.96, green: 0.66, blue: 0.45).opacity(0.82)
+                                    stops: [
+                                        .init(color: Color(red: 0.92, green: 0.91, blue: 0.66).opacity(0.82), location: 0.0),
+                                        .init(color: Color(red: 0.97, green: 0.75, blue: 0.57).opacity(0.88), location: 0.58),
+                                        .init(color: Color(red: 0.81, green: 0.93, blue: 0.90).opacity(0.82), location: 1.0)
                                     ],
                                     startPoint: .leading,
                                     endPoint: .trailing
@@ -577,12 +688,12 @@ private struct ReflectPatternsPreviewChart: View {
                             .fill(
                                 RadialGradient(
                                     colors: [
-                                        Color(red: 0.94, green: 0.62, blue: 0.4).opacity(0.72),
+                                        Color(red: 0.96, green: 0.67, blue: 0.46).opacity(0.46),
                                         Color.clear
                                     ],
-                                    center: UnitPoint(x: 0.63, y: 0.54),
-                                    startRadius: 10,
-                                    endRadius: max(size.width, size.height) * 0.62
+                                    center: UnitPoint(x: 0.62, y: 0.52),
+                                    startRadius: 12,
+                                    endRadius: max(size.width, size.height) * 0.66
                                 )
                             )
 
@@ -612,14 +723,21 @@ private struct ReflectPatternsPreviewChart: View {
                 }
                 .frame(height: 170)
 
-                HStack(spacing: 0) {
-                    ForEach(xAxisLabels.indices, id: \.self) { index in
-                        Text(xAxisLabels[index])
-                            .font(.custom("AvenirNext-Regular", size: 12))
-                            .foregroundStyle(Color.black.opacity(0.75))
-                            .frame(maxWidth: .infinity)
+                GeometryReader { proxy in
+                    let labelCount = xAxisLabels.count
+                    ZStack {
+                        ForEach(xAxisLabels.indices, id: \.self) { index in
+                            Text(xAxisLabels[index])
+                                .font(.custom("AvenirNext-Regular", size: 12))
+                                .foregroundStyle(Color.black.opacity(0.75))
+                                .position(
+                                    x: chartXPosition(for: index, in: proxy.size.width, pointCount: labelCount),
+                                    y: 8
+                                )
+                        }
                     }
                 }
+                .frame(height: 16)
             }
             .frame(maxWidth: .infinity)
 
@@ -658,13 +776,20 @@ private struct ReflectPatternsPreviewChart: View {
 
     private func chartPoints(in size: CGSize) -> [CGPoint] {
         guard chartValues.count > 1 else { return [] }
-        let xStep = size.width / CGFloat(chartValues.count - 1)
         return chartValues.enumerated().map { index, value in
             CGPoint(
-                x: xStep * CGFloat(index),
+                x: chartXPosition(for: index, in: size.width, pointCount: chartValues.count),
                 y: yPosition(for: value, in: size.height)
             )
         }
+    }
+
+    private func chartXPosition(for index: Int, in width: CGFloat, pointCount: Int) -> CGFloat {
+        guard pointCount > 1 else { return width / 2 }
+        let inset: CGFloat = 0
+        let usableWidth = max(width - (inset * 2), 0)
+        let step = usableWidth / CGFloat(pointCount - 1)
+        return inset + (step * CGFloat(index))
     }
 
     private func yPosition(for value: CGFloat, in height: CGFloat) -> CGFloat {
@@ -798,6 +923,8 @@ struct ReflectStreakCard: View {
 
 struct ReflectYesterdayMoodSummary: View {
     let mood: ReflectMoodOption
+    var alignMoodLabelToBottom: Bool = false
+    var minHeight: CGFloat? = nil
 
     var body: some View {
         VStack(spacing: 8) {
@@ -811,11 +938,15 @@ struct ReflectYesterdayMoodSummary: View {
             MoodAssetImage(assetName: mood.assetName, intensity: 0.85)
                 .frame(width: 122, height: 122)
 
+            if alignMoodLabelToBottom {
+                Spacer(minLength: 0)
+            }
+
             Text(mood.name)
                 .font(.custom("Poppins-Regular", size: 18))
                 .foregroundStyle(Color.black.opacity(0.88))
         }
-        .frame(maxWidth: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: minHeight, alignment: .top)
     }
 }
 
@@ -1036,6 +1167,7 @@ struct ReflectMoodCard: View {
 struct DailyMoodView: View {
     @Binding var loggedMoods: [ReflectDateKey: ReflectMoodOption]
     var isEmbeddedInLanding: Bool = false
+    var externalIsMoodOrbitDragging: Binding<Bool>? = nil
     @State private var selectedMoodIndex: Int? = nil
     @State private var isMoodOrbitDragging = false
     @State private var moodLevels: [MoodLevelState] = [
@@ -1055,15 +1187,15 @@ struct DailyMoodView: View {
     var body: some View {
         Group {
             if isEmbeddedInLanding {
-                VStack(spacing: 20) {
+                VStack(spacing: 28) {
                     dailyMoodCoreContent
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 20)
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
-                        VStack(spacing: 20) {
+                        VStack(spacing: 28) {
                             dailyMoodCoreContent
                         }
                         .padding(.horizontal, 12)
@@ -1109,9 +1241,16 @@ struct DailyMoodView: View {
             moodLevels = orderedMoodLevels(
                 ReflectMoodLevelStore.loadLevels(for: todayKey, defaults: moodLevels)
             )
+            externalIsMoodOrbitDragging?.wrappedValue = false
         }
         .onChange(of: moodLevels) { _ in
             ReflectMoodLevelStore.saveLevels(moodLevels, for: todayKey)
+        }
+        .onChange(of: isMoodOrbitDragging) { dragging in
+            externalIsMoodOrbitDragging?.wrappedValue = dragging
+        }
+        .onDisappear {
+            externalIsMoodOrbitDragging?.wrappedValue = false
         }
     }
 
@@ -1203,56 +1342,34 @@ struct DailyMoodView: View {
                 }
             }
 
+            ReflectSectionTitle(text: "Past Moods", leadingAssetName: "planet2")
+                .padding(.top, 8)
+
             ReflectTodayGradientCard {
                 VStack(spacing: 12) {
                     HStack(spacing: 14) {
                         Button {
+                            triggerArrowHaptic()
                             currentMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth) ?? currentMonth
                         } label: {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 16, weight: .medium))
                                 .frame(width: 34, height: 34)
-                                .background(
-                                    Circle()
-                                        .fill(Color.white.opacity(0.9))
-                                )
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                                )
                         }
 
                         Spacer(minLength: 6)
                         Text(monthTitle(currentMonth))
                             .font(.custom("SortsMillGoudy-Italic", size: 24))
                             .foregroundStyle(Color(red: 0.18, green: 0.08, blue: 0.08))
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 22)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(Color.white.opacity(0.95))
-                                    .shadow(color: Color.black.opacity(0.14), radius: 10, x: 0, y: 6)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
-                            )
                         Spacer(minLength: 6)
 
                         Button {
+                            triggerArrowHaptic()
                             currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
                         } label: {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 16, weight: .medium))
                                 .frame(width: 34, height: 34)
-                                .background(
-                                    Circle()
-                                        .fill(Color.white.opacity(0.9))
-                                )
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                                )
                         }
                     }
                     .font(.system(size: 16, weight: .medium))
@@ -1271,37 +1388,38 @@ struct DailyMoodView: View {
 
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
                         let gridDays = monthGridDays(for: currentMonth)
+                        let calendarCellHeight: CGFloat = 42
                         ForEach(Array(gridDays.enumerated()), id: \.offset) { _, day in
-                            if day == 0 {
-                                Color.clear.frame(height: 32)
-                            } else {
-                                VStack(spacing: 6) {
-                                    if let mood = moodForDay(day, in: currentMonth) {
-                                        MoodAssetImage(
-                                            assetName: mood.assetName,
-                                            intensity: 0.7
-                                        )
-                                        .frame(width: 26, height: 26)
-                                    } else {
-                                        Color.clear.frame(width: 26, height: 26)
+                            Group {
+                                if day == 0 {
+                                    Color.clear
+                                } else {
+                                    VStack(spacing: 6) {
+                                        if let mood = moodForDay(day, in: currentMonth) {
+                                            MoodAssetImage(
+                                                assetName: mood.assetName,
+                                                intensity: 0.7
+                                            )
+                                            .frame(width: 26, height: 26)
+                                        } else {
+                                            Color.clear.frame(width: 26, height: 26)
+                                        }
+                                        Text("\(day)")
+                                            .font(.custom("Poppins-Regular", size: 10))
+                                            .foregroundStyle(Color.black.opacity(moodForDay(day, in: currentMonth) == nil ? 0.3 : 0.75))
                                     }
-                                    Text("\(day)")
-                                        .font(.custom("Poppins-Regular", size: 10))
-                                        .foregroundStyle(Color.black.opacity(moodForDay(day, in: currentMonth) == nil ? 0.3 : 0.75))
                                 }
                             }
+                            .frame(maxWidth: .infinity, minHeight: calendarCellHeight, maxHeight: calendarCellHeight, alignment: .top)
                         }
                     }
                 }
             }
+            .padding(.bottom, 8)
 
             if !mostExperiencedMoods.isEmpty {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("Most experienced moods")
-                        .font(.custom("SortsMillGoudy-Regular", size: sectionTitleFontSize))
-                        .foregroundStyle(Color.black.opacity(0.86))
-                        .fixedSize(horizontal: true, vertical: false)
-                        .layoutPriority(1)
+                    ReflectSectionTitle(text: "Most Experienced Moods", leadingAssetName: "planet2")
 
                     LazyVGrid(
                         columns: [
@@ -1315,6 +1433,7 @@ struct DailyMoodView: View {
                         }
                     }
                 }
+                .padding(.top, 8)
             }
         }
     }
@@ -1395,12 +1514,19 @@ struct MoodSelectorPreview: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            MoodAssetImage(assetName: mood.assetName, intensity: 0.7)
+            MoodAssetImage(assetName: mood.assetName, intensity: isSelected ? 0.85 : 0.7)
                 .frame(width: size, height: size)
-                .overlay(
-                    Circle()
-                        .stroke(isSelected ? Color.black.opacity(0.6) : Color.clear, lineWidth: 1)
-                )
+                .scaleEffect(isSelected ? 1.08 : 1.0)
+            .overlay(alignment: .bottom) {
+                if isSelected {
+                    Capsule()
+                        .fill(Color.black.opacity(0.42))
+                        .frame(width: 24, height: 3)
+                        .offset(y: 8)
+                }
+            }
+            .animation(.easeOut(duration: 0.16), value: isSelected)
+
             if showLabel {
                 Text(mood.name)
                     .font(.custom("AvenirNext-Regular", size: isSelected ? 13 : 11))
@@ -1415,6 +1541,7 @@ struct MoodOrbitPicker: View {
     @Binding var isDragging: Bool
     let onSelect: (Int) -> Void
     @State private var feedbackGenerator = UISelectionFeedbackGenerator()
+    @State private var impactGenerator = UIImpactFeedbackGenerator(style: .soft)
 
     var body: some View {
         GeometryReader { proxy in
@@ -1462,7 +1589,7 @@ struct MoodOrbitPicker: View {
                             isSelected: idx == selectedMoodIndex,
                             showLabel: false
                         )
-                        .frame(width: 72, height: 72)
+                        .frame(width: 80, height: 80)
                         .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
@@ -1471,11 +1598,13 @@ struct MoodOrbitPicker: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
-            .simultaneousGesture(
+            .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in
                         if !isDragging {
                             isDragging = true
+                            impactGenerator.impactOccurred(intensity: 0.65)
+                            impactGenerator.prepare()
                         }
                         guard let nearestIndex = nearestMoodIndex(
                             to: gesture.location,
@@ -1485,11 +1614,14 @@ struct MoodOrbitPicker: View {
                         selectMood(at: nearestIndex)
                     }
                     .onEnded { _ in
+                        impactGenerator.impactOccurred(intensity: 0.45)
+                        impactGenerator.prepare()
                         isDragging = false
                     }
             )
             .onAppear {
                 feedbackGenerator.prepare()
+                impactGenerator.prepare()
             }
             .onDisappear {
                 isDragging = false
@@ -1531,6 +1663,8 @@ struct MoodOrbitPicker: View {
         onSelect(index)
         feedbackGenerator.selectionChanged()
         feedbackGenerator.prepare()
+        impactGenerator.impactOccurred(intensity: 0.8)
+        impactGenerator.prepare()
     }
 }
 
@@ -1538,21 +1672,18 @@ struct MoodOrbitPicker: View {
 
 struct PatternsTrendsView: View {
     private let inkColor = Color(red: 0.13, green: 0.13, blue: 0.13)
-    private let accentColor = Color(red: 0.16, green: 0.3, blue: 0.22)
+    private let sectionTitleSize: CGFloat = 24
+    private let bodyFontSize: CGFloat = 14
     private let calendar = Calendar.current
+    private let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        return formatter
+    }()
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedRange: TrendsRange = .past7Days
     @State private var journalEntries: [ReflectJournalEntry] = []
     @State private var moodLevelsRefreshTick: Int = 0
     var isEmbeddedInLanding: Bool = false
-
-    private enum TrendsRange: String, CaseIterable, Identifiable {
-        case today = "Today"
-        case past7Days = "Past 7 days"
-        case past30Days = "Past 30 days"
-
-        var id: String { rawValue }
-    }
 
     private struct AnalyticsExcerpt: Identifiable {
         let id: UUID
@@ -1560,11 +1691,20 @@ struct PatternsTrendsView: View {
         let weekday: String
     }
 
+    private struct MoodDayMetrics {
+        let date: Date
+        let stress: CGFloat
+        let fun: CGFloat
+        let inspired: CGFloat
+        let tenseScore: CGFloat
+        let driftHours: CGFloat
+    }
+
     var body: some View {
         Group {
             if isEmbeddedInLanding {
                 patternsPageContent
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 2)
                     .padding(.vertical, 4)
             } else {
                 ScrollView {
@@ -1602,7 +1742,7 @@ struct PatternsTrendsView: View {
     }
 
     private var patternsPageContent: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 30) {
             if !isEmbeddedInLanding {
                 VStack(spacing: 10) {
                     Text("Patterns & Trends")
@@ -1614,139 +1754,181 @@ struct PatternsTrendsView: View {
             }
 
             TrendsMoodAnalyticsCard {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Spacer()
-                        Button {
-                            selectedRange = nextRange(after: selectedRange)
-                        } label: {
-                            Text(selectedRange.rawValue)
-                                .font(.custom("AvenirNext-Regular", size: 11))
-                                .foregroundStyle(inkColor.opacity(0.7))
-                                .padding(.vertical, 4)
-                                .padding(.horizontal, 10)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.white.opacity(0.6))
-                                )
-                        }
-                        .buttonStyle(.plain)
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 8) {
+                        Image("planet2")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                        Text("Mood Levels")
+                            .font(.custom("SortsMillGoudy-Regular", size: sectionTitleSize))
+                            .foregroundStyle(inkColor.opacity(0.92))
                     }
 
                     ReflectPatternsPreviewChart(scores: trendGraphScores)
                         .frame(height: 250)
+                }
+            }
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Image(systemName: "chart.line.uptrend.xyaxis")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(inkColor.opacity(0.85))
-                            Text("Analytics")
-                                .font(.custom("SortsMillGoudy-Italic", size: 22))
-                                .foregroundStyle(inkColor.opacity(0.95))
+            TrendsMoodAnalyticsCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image("planet2")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                        Text("Analytics")
+                            .font(.custom("SortsMillGoudy-Regular", size: sectionTitleSize))
+                            .foregroundStyle(inkColor.opacity(0.95))
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(analyticsInsightLines.indices, id: \.self) { index in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("•")
+                                    .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+                                    .foregroundStyle(inkColor.opacity(0.85))
+                                Text(analyticsInsightLines[index])
+                                    .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+                                    .foregroundStyle(inkColor.opacity(0.86))
+                            }
                         }
+                    }
 
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("•")
-                                .font(.custom("AvenirNext-Medium", size: 17))
-                                .foregroundStyle(inkColor.opacity(0.85))
-                            Text(analyticsSummaryLine)
-                                .font(.custom("AvenirNext-Regular", size: 14))
-                                .foregroundStyle(inkColor.opacity(0.86))
-                        }
-
-                        if analyticsExcerpts.isEmpty {
-                            Text(emptyAnalyticsText)
-                                .font(.custom("AvenirNext-Regular", size: 14))
-                                .foregroundStyle(inkColor.opacity(0.62))
-                                .padding(.top, 2)
-                        } else {
-                            VStack(alignment: .leading, spacing: 8) {
-                                ForEach(analyticsExcerpts) { excerpt in
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("\"\(excerpt.text)\"")
-                                            .font(.custom("AvenirNext-Regular", size: 15))
-                                            .foregroundStyle(inkColor.opacity(0.9))
-                                        Text("- \(excerpt.weekday)")
-                                            .font(.custom("AvenirNext-Regular", size: 13))
-                                            .foregroundStyle(inkColor.opacity(0.68))
-                                            .padding(.leading, 8)
-                                    }
+                    if analyticsExcerpts.isEmpty {
+                        Text(emptyAnalyticsText)
+                            .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+                            .foregroundStyle(inkColor.opacity(0.62))
+                            .padding(.top, 2)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(analyticsExcerpts) { excerpt in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("•")
+                                        .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+                                        .foregroundStyle(inkColor.opacity(0.85))
+                                    Text("\"\(excerpt.text)\" — \(excerpt.weekday)")
+                                        .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+                                        .foregroundStyle(inkColor.opacity(0.86))
+                                        .lineLimit(2)
+                                        .truncationMode(.tail)
                                 }
                             }
-                            .padding(.top, 2)
                         }
                     }
                 }
             }
 
-            TrendsSurfaceCard {
-                VStack(spacing: 12) {
-                    Text("Insights")
-                        .font(.custom("SortsMillGoudy-Italic", size: 22))
-                        .foregroundStyle(inkColor.opacity(0.9))
-                        .frame(maxWidth: .infinity, alignment: .center)
-
-                    Text("On days when Escape apps were over 2 hours,\nyour stress levels were higher.")
-                        .font(.custom("SortsMillGoudy-Regular", size: 14))
-                        .foregroundStyle(inkColor.opacity(0.86))
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(1)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-                .padding(.vertical, 2)
-            }
-
             ReflectPatternsGradientCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Suggestions")
-                        .font(.custom("SortsMillGoudy-Regular", size: 20))
-                        .foregroundStyle(inkColor.opacity(0.95))
+                    HStack(spacing: 8) {
+                        Image("planet2")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                        Text("Suggestions")
+                            .font(.custom("SortsMillGoudy-Regular", size: sectionTitleSize))
+                            .foregroundStyle(inkColor.opacity(0.95))
+                    }
 
-                    Text("Attempt to take intermittent breaks from\nDrifting apps in order to increase productivity\non a daily basis!")
-                        .font(.custom("AvenirNext-Medium", size: 14))
-                        .foregroundStyle(inkColor.opacity(0.88))
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(suggestionLines.indices, id: \.self) { index in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("•")
+                                    .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+                                    .foregroundStyle(inkColor.opacity(0.85))
+                                Text(suggestionLines[index])
+                                    .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+                                    .foregroundStyle(inkColor.opacity(0.88))
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.vertical, 2)
             }
         }
     }
 
-    private func nextRange(after range: TrendsRange) -> TrendsRange {
-        let all = TrendsRange.allCases
-        guard let index = all.firstIndex(of: range) else { return .past7Days }
-        let nextIndex = all.index(after: index)
-        return nextIndex == all.endIndex ? all[all.startIndex] : all[nextIndex]
+    private var trackedMoodMetrics: [MoodDayMetrics] {
+        past7DayDates.compactMap { date in
+            let key = ReflectDateKey(date: date, calendar: calendar)
+            guard ReflectMoodLevelStore.hasLevels(for: key) else { return nil }
+
+            let defaults: [MoodLevelState] = [
+                .init(label: "stress", value: 0.5),
+                .init(label: "laziness", value: 0.5),
+                .init(label: "fun", value: 0.5),
+                .init(label: "inspired", value: 0.5)
+            ]
+            let levels = ReflectMoodLevelStore.loadLevels(for: key, defaults: defaults)
+            return MoodDayMetrics(
+                date: date,
+                stress: CGFloat(levelValue(for: "stress", in: levels)),
+                fun: CGFloat(levelValue(for: "fun", in: levels)),
+                inspired: CGFloat(levelValue(for: "inspired", in: levels)),
+                tenseScore: moodScore(for: date),
+                driftHours: driftHours(from: levels)
+            )
+        }
     }
 
-    private var analyticsSummaryLine: String {
-        switch selectedRange {
-        case .today:
-            return "Today pulls one excerpt from your journal entry."
-        case .past7Days:
-            return "Past 7 days surfaces meaningful excerpts from entries in the last week."
-        case .past30Days:
-            return "Past 30 days surfaces meaningful excerpts from entries in the last month."
+    private var analyticsInsightLines: [String] {
+        let metrics = trackedMoodMetrics
+        guard metrics.count >= 3 else {
+            return ["Log mood levels on at least 3 days to unlock percentage-based analytics."]
         }
+
+        var lines: [String] = []
+
+        let anxiousDays = metrics.filter { $0.stress >= 0.6 }
+        let lowerStressDays = metrics.filter { $0.stress < 0.6 }
+        if !anxiousDays.isEmpty && !lowerStressDays.isEmpty {
+            let tenseChange = percentageChange(
+                from: average(lowerStressDays.map(\.tenseScore)),
+                to: average(anxiousDays.map(\.tenseScore))
+            )
+            let driftChange = percentageChange(
+                from: average(lowerStressDays.map(\.driftHours)),
+                to: average(anxiousDays.map(\.driftHours))
+            )
+            let tenseText = tenseChange >= 0 ? "\(abs(tenseChange))% more tense" : "\(abs(tenseChange))% calmer"
+            let driftText = driftChange >= 0 ? "\(abs(driftChange))% higher drift hours" : "\(abs(driftChange))% lower drift hours"
+            lines.append("On more anxious days, you were \(tenseText) with \(driftText).")
+        }
+
+        let happierDays = metrics.filter { (($0.fun + $0.inspired) / 2) >= 0.6 }
+        let lowerHappyDays = metrics.filter { (($0.fun + $0.inspired) / 2) < 0.6 }
+        if !happierDays.isEmpty && !lowerHappyDays.isEmpty {
+            let calmOnHappier = average(happierDays.map { 6 - $0.tenseScore })
+            let calmOnLowerHappy = average(lowerHappyDays.map { 6 - $0.tenseScore })
+            let calmChange = percentageChange(from: calmOnLowerHappy, to: calmOnHappier)
+            let driftChange = percentageChange(
+                from: average(lowerHappyDays.map(\.driftHours)),
+                to: average(happierDays.map(\.driftHours))
+            )
+            let calmText = calmChange >= 0 ? "\(abs(calmChange))% more calm" : "\(abs(calmChange))% less calm"
+            let driftText = driftChange <= 0 ? "\(abs(driftChange))% lower drift hours" : "\(abs(driftChange))% higher drift hours"
+            lines.append("On happier days, you felt \(calmText) and had \(driftText).")
+        }
+
+        if lines.isEmpty {
+            let moodAvg = average(metrics.map(\.tenseScore))
+            let driftAvg = average(metrics.map(\.driftHours))
+            lines.append("From your \(metrics.count) logged days, mood averaged \(String(format: "%.1f", moodAvg))/5 and drift was about \(String(format: "%.1f", driftAvg))h.")
+        }
+
+        return Array(lines.prefix(2))
     }
 
     private var emptyAnalyticsText: String {
-        switch selectedRange {
-        case .today:
-            return "No journal entry for today yet."
-        case .past7Days:
-            return "No journal entries found in the past 7 days."
-        case .past30Days:
-            return "No journal entries found in the past 30 days."
-        }
+        "No journal entries found in the past 7 days."
     }
 
     private var analyticsExcerpts: [AnalyticsExcerpt] {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE"
-        return filteredEntries.prefix(excerptLimit).map { entry in
+        return filteredEntries.prefix(3).map { entry in
             AnalyticsExcerpt(
                 id: entry.id,
                 text: meaningfulExcerpt(from: entry),
@@ -1755,64 +1937,31 @@ struct PatternsTrendsView: View {
         }
     }
 
-    private var excerptLimit: Int {
-        switch selectedRange {
-        case .today:
-            return 1
-        case .past7Days:
-            return 3
-        case .past30Days:
-            return 5
-        }
-    }
-
     private var filteredEntries: [ReflectJournalEntry] {
         let today = calendar.startOfDay(for: Date())
         let contentEntries = journalEntries.filter(hasJournalContent)
-        switch selectedRange {
-        case .today:
-            return contentEntries.filter { calendar.isDate($0.date, inSameDayAs: today) }
-        case .past7Days:
-            guard let start = calendar.date(byAdding: .day, value: -6, to: today) else { return [] }
-            return contentEntries.filter { entry in
-                let day = calendar.startOfDay(for: entry.date)
-                return day >= start && day <= today
-            }
-        case .past30Days:
-            guard let start = calendar.date(byAdding: .day, value: -29, to: today) else { return [] }
-            return contentEntries.filter { entry in
-                let day = calendar.startOfDay(for: entry.date)
-                return day >= start && day <= today
-            }
+        guard let start = calendar.date(byAdding: .day, value: -6, to: today) else { return [] }
+        return contentEntries.filter { entry in
+            let day = calendar.startOfDay(for: entry.date)
+            return day >= start && day <= today
         }
     }
 
     private var trendGraphScores: [CGFloat] {
         _ = moodLevelsRefreshTick
-        return moodTrendScores(for: selectedRange)
+        return scoresForPastDays(7)
     }
 
-    private func moodTrendScores(for range: TrendsRange) -> [CGFloat] {
-        switch range {
-        case .today:
-            let todayScore = moodScore(for: Date())
-            return Array(repeating: todayScore, count: 7)
-        case .past7Days:
-            return scoresForPastDays(7)
-        case .past30Days:
-            let raw = scoresForPastDays(30)
-            guard !raw.isEmpty else { return Array(repeating: 3, count: 7) }
-
-            let bucketCount = 7
-            return (0..<bucketCount).map { bucket in
-                let start = Int((Double(bucket) * Double(raw.count) / Double(bucketCount)).rounded(.down))
-                let end = Int((Double(bucket + 1) * Double(raw.count) / Double(bucketCount)).rounded(.down))
-                let safeEnd = max(end, start + 1)
-                let slice = raw[start..<min(safeEnd, raw.count)]
-                let average = slice.reduce(0, +) / CGFloat(max(slice.count, 1))
-                return average
-            }
+    private var past7DayDates: [Date] {
+        let today = calendar.startOfDay(for: Date())
+        return (0..<7).compactMap { offset in
+            calendar.date(byAdding: .day, value: -6 + offset, to: today)
         }
+    }
+
+    private var past7DayDriftHours: [CGFloat] {
+        _ = moodLevelsRefreshTick
+        return past7DayDates.map(driftHours(for:))
     }
 
     private func scoresForPastDays(_ dayCount: Int) -> [CGFloat] {
@@ -1850,6 +1999,76 @@ struct PatternsTrendsView: View {
         levels.first(where: { $0.label.caseInsensitiveCompare(label) == .orderedSame })?.value ?? 0.5
     }
 
+    private func driftHours(for date: Date) -> CGFloat {
+        let key = ReflectDateKey(date: date, calendar: calendar)
+        let defaults: [MoodLevelState] = [
+            .init(label: "stress", value: 0.5),
+            .init(label: "laziness", value: 0.5),
+            .init(label: "fun", value: 0.5),
+            .init(label: "inspired", value: 0.5)
+        ]
+        let levels = ReflectMoodLevelStore.loadLevels(for: key, defaults: defaults)
+        return driftHours(from: levels)
+    }
+
+    private func driftHours(from levels: [MoodLevelState]) -> CGFloat {
+        let stress = CGFloat(levelValue(for: "stress", in: levels))
+        let laziness = CGFloat(levelValue(for: "laziness", in: levels))
+        let fun = CGFloat(levelValue(for: "fun", in: levels))
+        let inspired = CGFloat(levelValue(for: "inspired", in: levels))
+
+        let driftSignal = (0.46 * stress) + (0.32 * laziness) + (0.14 * (1 - fun)) + (0.08 * (1 - inspired))
+        let clamped = min(max(driftSignal, 0), 1)
+        return 0.5 + (clamped * 4.5)
+    }
+
+    private func average(_ values: [CGFloat]) -> CGFloat {
+        guard !values.isEmpty else { return 0 }
+        return values.reduce(0, +) / CGFloat(values.count)
+    }
+
+    private func percentageChange(from baseline: CGFloat, to value: CGFloat) -> Int {
+        guard abs(baseline) > 0.0001 else { return 0 }
+        return Int((((value - baseline) / baseline) * 100).rounded())
+    }
+
+    private var suggestionLines: [String] {
+        let mood = trendGraphScores
+        let drift = past7DayDriftHours
+        guard mood.count == 7, drift.count == 7 else {
+            return ["Log mood levels daily to unlock personalized suggestions for tense/calm and drift-hour patterns."]
+        }
+
+        let moodAvg = average(mood)
+        let driftAvg = average(drift)
+        let moodDelta = mood.last! - mood.first!
+        let driftDelta = drift.last! - drift.first!
+
+        let peakDriftIndex = drift.enumerated().max(by: { $0.element < $1.element })?.offset ?? 6
+        let peakDay = weekdayFormatter.string(from: past7DayDates[peakDriftIndex])
+        let roundedTarget = Int(max(1, min(4, (driftAvg - 0.5).rounded())))
+
+        var lines: [String] = []
+
+        if moodAvg >= 3.4 && driftAvg >= 2.7 {
+            lines.append("Your week leaned tense and drift usage was higher (\(String(format: "%.1f", driftAvg))h/day). Set a soft cap near \(roundedTarget)h and take a short reset break before late-night app use.")
+        } else if moodAvg <= 2.4 && driftAvg <= 2.0 {
+            lines.append("You stayed mostly calm with controlled drift time. Keep the same rhythm and protect the hours that felt most focused.")
+        } else {
+            lines.append("Tense/calm levels were mixed this week. A consistent daily drift window can help keep mood swings from compounding.")
+        }
+
+        if moodDelta >= 0.6 || driftDelta >= 0.8 {
+            lines.append("Stress signals rose toward the end of the week. Try moving drifting sessions earlier and adding a 10-minute wind-down before bed.")
+        } else if moodDelta <= -0.6 && driftDelta <= -0.5 {
+            lines.append("Your trend improved through the week with lower drift and calmer mood. Repeat what worked on your best day.")
+        } else {
+            lines.append("Your highest drift day was \(peakDay). Put a small checkpoint before opening drift-heavy apps on that day next week.")
+        }
+
+        return Array(lines.prefix(2))
+    }
+
     private func normalizeEntries(_ entries: [ReflectJournalEntry]) -> [ReflectJournalEntry] {
         var buckets: [ReflectDateKey: ReflectJournalEntry] = [:]
         for entry in entries.sorted(by: { $0.date > $1.date }) {
@@ -1864,15 +2083,15 @@ struct PatternsTrendsView: View {
     private func meaningfulExcerpt(from entry: ReflectJournalEntry) -> String {
         let journal = entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !journal.isEmpty {
-            return shortenExcerpt(journal)
+            return shortenExcerpt(journal, maxLength: 72)
         }
 
         let response = entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
         if !response.isEmpty {
-            return shortenExcerpt(filledPromptString(entry.prompt, with: response))
+            return shortenExcerpt(ReflectJournalPrompt.filledPromptString(entry.prompt, with: response), maxLength: 72)
         }
 
-        return shortenExcerpt(ReflectJournalPrompt.displayPrompt(entry.prompt))
+        return shortenExcerpt(ReflectJournalPrompt.displayPrompt(entry.prompt), maxLength: 72)
     }
 
     private func hasJournalContent(_ entry: ReflectJournalEntry) -> Bool {
@@ -1881,24 +2100,18 @@ struct PatternsTrendsView: View {
         return !journal.isEmpty || !response.isEmpty
     }
 
-    private func filledPromptString(_ prompt: String, with entry: String) -> String {
-        let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return ReflectJournalPrompt.displayPrompt(prompt) }
-
-        if prompt.contains("...") {
-            return prompt.replacingOccurrences(of: "...", with: trimmed)
-        }
-        if prompt.contains("_____") {
-            return prompt.replacingOccurrences(of: "_____", with: trimmed)
-        }
-        return "\(prompt) \(trimmed)"
-    }
-
     private func shortenExcerpt(_ text: String, maxLength: Int = 110) -> String {
         let condensed = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         guard condensed.count > maxLength else { return condensed }
-        let prefix = condensed.prefix(max(0, maxLength - 1))
-        return "\(prefix)…"
+        let cutIndex = condensed.index(condensed.startIndex, offsetBy: maxLength)
+        let candidate = String(condensed[..<cutIndex])
+        if let lastWhitespace = candidate.lastIndex(where: { $0.isWhitespace }) {
+            let wordSafe = String(candidate[..<lastWhitespace]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !wordSafe.isEmpty {
+                return wordSafe
+            }
+        }
+        return candidate.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -2118,7 +2331,6 @@ struct SelfJournalView: View {
     @State private var promptResponse = ""
     @State private var prompt: String
     @State private var journalEntries: [ReflectJournalEntry] = []
-    @State private var entryTags: [UUID: Set<JournalTag>] = [:]
     @State private var selectedEntryID: UUID? = nil
     @FocusState private var isEntryFocused: Bool
     private let today = Date()
@@ -2130,29 +2342,34 @@ struct SelfJournalView: View {
     private let onPromptChange: (String) -> Void
     private let onPromptResponseSave: (String) -> Void
     private let isEmbeddedInLanding: Bool
+    private let externalIsJournalCoverEditing: Binding<Bool>?
+    private let externalPastEntriesJumpDate: Binding<Date?>?
+    private let externalPastEntriesJumpToken: Binding<UUID?>?
     @Environment(\.dismiss) private var dismiss
 
     init(
         initialPrompt: String,
         onPromptChange: @escaping (String) -> Void,
         onPromptResponseSave: @escaping (String) -> Void,
-        isEmbeddedInLanding: Bool = false
+        isEmbeddedInLanding: Bool = false,
+        externalIsJournalCoverEditing: Binding<Bool>? = nil,
+        externalPastEntriesJumpDate: Binding<Date?>? = nil,
+        externalPastEntriesJumpToken: Binding<UUID?>? = nil
     ) {
         _prompt = State(initialValue: initialPrompt)
         self.onPromptChange = onPromptChange
         self.onPromptResponseSave = onPromptResponseSave
         self.isEmbeddedInLanding = isEmbeddedInLanding
-    }
-
-    private var wordCount: Int {
-        promptResponse.split { $0 == " " || $0 == "\n" || $0 == "\t" }.count
+        self.externalIsJournalCoverEditing = externalIsJournalCoverEditing
+        self.externalPastEntriesJumpDate = externalPastEntriesJumpDate
+        self.externalPastEntriesJumpToken = externalPastEntriesJumpToken
     }
 
     var body: some View {
         Group {
             if isEmbeddedInLanding {
                 journalPageContent
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 0)
                     .padding(.vertical, 4)
             } else {
                 ScrollView {
@@ -2187,9 +2404,6 @@ struct SelfJournalView: View {
             if journalEntries.isEmpty {
                 journalEntries = normalizeEntries(ReflectJournalStore.loadEntries())
             }
-            if entryTags.isEmpty {
-                entryTags = ReflectJournalTagStore.loadTags()
-            }
             let todayKey = ReflectDateKey(date: today, calendar: calendar)
             if let todayEntry = journalEntries.first(where: { ReflectDateKey(date: $0.date, calendar: calendar) == todayKey }) {
                 promptResponse = ""
@@ -2212,16 +2426,16 @@ struct SelfJournalView: View {
         .onChange(of: journalEntries) { _ in
             ReflectJournalStore.saveEntries(journalEntries)
         }
-        .onChange(of: entryTags) { _ in
-            ReflectJournalTagStore.saveTags(entryTags)
-        }
         .onChange(of: prompt) { _ in
             upsertPromptForToday()
+        }
+        .onDisappear {
+            externalIsJournalCoverEditing?.wrappedValue = false
         }
     }
 
     private var journalPageContent: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 30) {
             if !isEmbeddedInLanding {
                 VStack(spacing: 10) {
                     Text("Self-Journal")
@@ -2237,17 +2451,10 @@ struct SelfJournalView: View {
 
             ReflectGradientCard {
                 VStack(spacing: 12) {
-                    HStack(alignment: .top, spacing: 10) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Today's prompt")
-                                .font(.custom("AvenirNext-Medium", size: 11))
-                                .foregroundStyle(inkColor.opacity(0.55))
-                            Text(promptPreviewText)
-                                .font(.custom("Georgia", size: max(14, ReflectJournalPrompt.promptFontSize(for: prompt) - 8)))
-                                .foregroundStyle(inkColor.opacity(0.88))
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
-                        }
+                    HStack(alignment: .center, spacing: 10) {
+                        Text("Today's prompt:")
+                            .font(.custom("SortsMillGoudy-Italic", size: 17))
+                            .foregroundStyle(inkColor.opacity(0.86))
                         Spacer(minLength: 8)
                         Button {
                             let newPrompt = ReflectJournalPrompt.randomPrompt()
@@ -2265,6 +2472,16 @@ struct SelfJournalView: View {
                         }
                         .buttonStyle(.plain)
                     }
+
+                    Text(promptPreviewText)
+                        .font(.custom("SortsMillGoudy-Regular", size: 18))
+                        .foregroundStyle(inkColor.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, minHeight: 50, maxHeight: 50, alignment: .center)
+                        .padding(.bottom, 2)
 
                     ZStack(alignment: .topLeading) {
                         TextEditor(text: $promptResponse)
@@ -2301,39 +2518,6 @@ struct SelfJournalView: View {
                             .font(.custom("AvenirNext-Regular", size: 11))
                             .foregroundStyle(inkColor.opacity(0.48))
                         Spacer()
-                        Text("\(wordCount) words")
-                            .font(.custom("AvenirNext-Medium", size: 10))
-                            .foregroundStyle(inkColor.opacity(0.45))
-                    }
-
-                    if let todayEntryID = todayEntryID {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Tags")
-                                .font(.custom("AvenirNext-Medium", size: 11))
-                                .foregroundStyle(inkColor.opacity(0.58))
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 6) {
-                                    ForEach(JournalTag.allCases) { tag in
-                                        let isSelected = entryTags[todayEntryID, default: []].contains(tag)
-                                        Button {
-                                            toggleTag(tag, for: todayEntryID)
-                                        } label: {
-                                            Text(tag.title)
-                                                .font(.custom("AvenirNext-Medium", size: 11))
-                                                .foregroundStyle(isSelected ? Color.black.opacity(0.9) : Color.black.opacity(0.65))
-                                                .padding(.vertical, 5)
-                                                .padding(.horizontal, 10)
-                                                .background(
-                                                    Capsule()
-                                                        .fill(isSelected ? tag.color.opacity(0.28) : Color.black.opacity(0.06))
-                                                )
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                                .padding(.horizontal, 2)
-                            }
-                        }
                     }
 
                     HStack(spacing: 8) {
@@ -2402,7 +2586,12 @@ struct SelfJournalView: View {
 
             ReflectJournalCoverSection(
                 entries: $journalEntries,
-                selectedEntryID: $selectedEntryID
+                selectedEntryID: $selectedEntryID,
+                externalOpenDate: externalPastEntriesJumpDate,
+                externalOpenToken: externalPastEntriesJumpToken,
+                onTodayEditingChange: { isEditing in
+                    externalIsJournalCoverEditing?.wrappedValue = isEditing
+                }
             )
         }
     }
@@ -2431,11 +2620,6 @@ struct SelfJournalView: View {
         return buckets.values.sorted { $0.date > $1.date }
     }
 
-    private var todayEntryID: UUID? {
-        let todayKey = ReflectDateKey(date: today, calendar: calendar)
-        return journalEntries.first(where: { ReflectDateKey(date: $0.date, calendar: calendar) == todayKey })?.id
-    }
-
     private var savedPromptResponseForToday: String {
         let todayKey = ReflectDateKey(date: today, calendar: calendar)
         return journalEntries.first(where: { ReflectDateKey(date: $0.date, calendar: calendar) == todayKey })?.promptResponse ?? ""
@@ -2444,25 +2628,15 @@ struct SelfJournalView: View {
     private var promptPreviewText: String {
         let saved = savedPromptResponseForToday.trimmingCharacters(in: .whitespacesAndNewlines)
         if !saved.isEmpty {
-            return filledPromptPreview(prompt, with: saved)
+            return ReflectJournalPrompt.filledPromptString(prompt, with: saved)
         }
 
         let draft = promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
         if !draft.isEmpty {
-            return filledPromptPreview(prompt, with: draft)
+            return ReflectJournalPrompt.filledPromptString(prompt, with: draft)
         }
 
         return ReflectJournalPrompt.displayPrompt(prompt)
-    }
-
-    private func toggleTag(_ tag: JournalTag, for entryID: UUID) {
-        var tags = entryTags[entryID, default: []]
-        if tags.contains(tag) {
-            tags.remove(tag)
-        } else {
-            tags.insert(tag)
-        }
-        entryTags[entryID] = tags
     }
 
     private func upsertPromptForToday() {
@@ -2475,21 +2649,6 @@ struct SelfJournalView: View {
                 at: 0
             )
         }
-    }
-
-    private func filledPromptPreview(_ prompt: String, with entry: String) -> String {
-        let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return ReflectJournalPrompt.displayPrompt(prompt)
-        }
-
-        if prompt.contains("...") {
-            return prompt.replacingOccurrences(of: "...", with: trimmed)
-        }
-        if prompt.contains("_____") {
-            return prompt.replacingOccurrences(of: "_____", with: trimmed)
-        }
-        return "\(prompt) \(trimmed)"
     }
 
     private var loggedEntryDates: [Date] {
@@ -2614,20 +2773,50 @@ private enum ReflectJournalCoverTab: String, CaseIterable, Identifiable {
 struct ReflectJournalCoverSection: View {
     @Binding var entries: [ReflectJournalEntry]
     @Binding var selectedEntryID: UUID?
+    var externalOpenDate: Binding<Date?>? = nil
+    var externalOpenToken: Binding<UUID?>? = nil
+    var onTodayEditingChange: ((Bool) -> Void)? = nil
 
     @State private var selectedTab: ReflectJournalCoverTab = .today
     @State private var isOpen = false
     @State private var isWritingToday = false
+    @State private var todayPageIndex: Int = 0
+    @State private var todayDraftPages: [String] = [""]
+    @State private var todayDraftPageIndex: Int = 0
+    @State private var pastEntriesJumpDate: Date? = nil
+    @State private var pastEntriesAutoOpenToken: UUID? = nil
+    @State private var handledExternalOpenToken: UUID? = nil
     @FocusState private var isTodayEditorFocused: Bool
 
-    private let tabTextColor = Color.black.opacity(0.8)
-    private let tabInactiveColor = Color.black.opacity(0.56)
+    private let tabTextColor = Color(red: 0.2, green: 0.28, blue: 0.22)
+    private let tabInactiveColor = Color(red: 0.2, green: 0.28, blue: 0.22).opacity(0.95)
     private let pageCardBackground = Color(red: 0.98, green: 0.98, blue: 0.97)
     private let coverPanelHeight: CGFloat = 520
+    private let todayDraftPageCharacterLimit: Int = 470
     private var calendar: Calendar {
         var cal = Calendar(identifier: .iso8601)
         cal.timeZone = .current
         return cal
+    }
+
+    private var journalTabGradient: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: Color(red: 0.97, green: 0.91, blue: 0.74), location: 0.0),
+                .init(color: Color(red: 0.97, green: 0.86, blue: 0.65), location: 0.62),
+                .init(color: Color(red: 0.96, green: 0.82, blue: 0.60), location: 1.0)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var externalOpenTokenValue: UUID? {
+        externalOpenToken?.wrappedValue ?? nil
+    }
+
+    private var externalOpenDateValue: Date? {
+        externalOpenDate?.wrappedValue ?? nil
     }
 
     var body: some View {
@@ -2637,10 +2826,7 @@ struct ReflectJournalCoverSection: View {
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.22)) {
-                        if isOpen {
-                            isWritingToday = false
-                            isTodayEditorFocused = false
-                        }
+                        if isOpen { finishTodayEditing() }
                         isOpen.toggle()
                     }
                 } label: {
@@ -2661,109 +2847,127 @@ struct ReflectJournalCoverSection: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(spacing: 0) {
-                ForEach(ReflectJournalCoverTab.allCases) { tab in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.22)) {
-                            selectedTab = tab
-                            isOpen = true
-                            if tab != .today {
-                                isWritingToday = false
-                                isTodayEditorFocused = false
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    ForEach(ReflectJournalCoverTab.allCases) { tab in
+                        let isSelected = selectedTab == tab
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                if selectedTab == .today && tab != .today {
+                                    finishTodayEditing()
+                                }
+                                if tab == .pastEntries {
+                                    pastEntriesAutoOpenToken = nil
+                                }
+                                selectedTab = tab
+                                isOpen = true
+                                if tab == .today {
+                                    todayPageIndex = 0
+                                }
                             }
-                        }
-                    } label: {
-                        VStack(spacing: 8) {
+                        } label: {
                             Text(tab.rawValue)
-                                .font(.custom("SortsMillGoudy-Regular", size: 13))
-                                .foregroundStyle(selectedTab == tab ? tabTextColor : tabInactiveColor)
-                                .frame(maxWidth: .infinity)
-
-                            Rectangle()
-                                .fill(selectedTab == tab ? Color.black.opacity(0.34) : Color.clear)
-                                .frame(height: 1)
+                                .font(.custom("Poppins-Regular", size: 11))
+                                .foregroundStyle(isSelected ? tabTextColor : tabInactiveColor)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.64)
+                                .allowsTightening(true)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .frame(minHeight: 39)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(
+                                            isSelected
+                                            ? AnyShapeStyle(Color.white.opacity(0.98))
+                                            : AnyShapeStyle(journalTabGradient)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .stroke(Color.white.opacity(0.8), lineWidth: 1)
+                                        )
+                                        .shadow(
+                                            color: isSelected ? Color.black.opacity(0.08) : Color.black.opacity(0.06),
+                                            radius: isSelected ? 2.8 : 2.2,
+                                            x: 0,
+                                            y: 0.8
+                                        )
+                                )
                         }
+                        .buttonStyle(.plain)
                         .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.plain)
-
-                    if tab != ReflectJournalCoverTab.allCases.last {
-                        Rectangle()
-                            .fill(Color.black.opacity(0.08))
-                            .frame(width: 1, height: 22)
-                    }
                 }
-            }
-            .padding(.horizontal, 10)
+                .padding(.horizontal, 0)
+                .padding(.bottom, -10)
+                .zIndex(0)
 
-            Group {
-                if isOpen {
-                    openJournalContent
-                } else {
-                    coverImage
-                        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.22)) {
-                                isOpen = true
+                Group {
+                    if isOpen {
+                        openJournalContent
+                    } else {
+                        coverImage
+                            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.22)) {
+                                    isOpen = true
+                                }
                             }
-                        }
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: coverPanelHeight, maxHeight: coverPanelHeight, alignment: .top)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
-            )
-            .overlay(alignment: .bottomTrailing) {
-                if isOpen && selectedTab == .today && !isWritingToday {
-                    Button {
-                        activateWritingMode()
-                    } label: {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.white.opacity(0.94))
-                                .frame(width: 52, height: 52)
-                                .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 4)
-
-                            Image("pencil")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 24, height: 24)
-                        }
                     }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 14)
-                    .padding(.bottom, 14)
                 }
+                .frame(maxWidth: .infinity, minHeight: coverPanelHeight, maxHeight: coverPanelHeight, alignment: .top)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+                .zIndex(1)
             }
-            .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onChange(of: isTodayEditorFocused) { focused in
+            if !focused && selectedTab == .today && isWritingToday {
+                finishTodayEditing()
+            }
+        }
+        .onChange(of: isWritingToday) { isEditing in
+            onTodayEditingChange?(isEditing)
+        }
+        .onChange(of: externalOpenTokenValue) { _ in
+            handleExternalOpenRequest()
+        }
+        .onChange(of: externalOpenDateValue) { _ in
+            handleExternalOpenRequest()
+        }
+        .onAppear {
+            onTodayEditingChange?(false)
+            handleExternalOpenRequest()
+        }
     }
 
     private var coverImage: some View {
-        ZStack(alignment: .leading) {
-            Group {
-                if let cover = UIImage(named: "journal") ?? UIImage(named: "journal.png") {
-                    Image(uiImage: cover)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(Color.white.opacity(0.85))
-                        .frame(height: coverPanelHeight)
-                        .overlay(
-                            Text("journal.png not found")
-                                .font(.custom("AvenirNext-Medium", size: 13))
-                                .foregroundStyle(Color.black.opacity(0.5))
-                        )
-                }
+        ZStack {
+            if let cover = UIImage(named: "journal") ?? UIImage(named: "journal.png") {
+                Image(uiImage: cover)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+            } else {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color.white.opacity(0.85))
+                    .frame(height: coverPanelHeight)
+                    .overlay(
+                        Text("journal.png not found")
+                            .font(.custom("AvenirNext-Medium", size: 13))
+                            .foregroundStyle(Color.black.opacity(0.5))
+                    )
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            Color.black.opacity(0.1)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.white.opacity(0.94))
+        .clipped()
     }
 
     @ViewBuilder
@@ -2772,37 +2976,35 @@ struct ReflectJournalCoverSection: View {
         case .today:
             ReflectJournalPageCard {
                 VStack(alignment: .leading, spacing: 14) {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.white.opacity(0.92))
-                        .frame(height: 86)
-                        .overlay(
-                            Text(todayPromptLine)
-                                .font(.custom("Georgia", size: 14))
-                                .foregroundStyle(Color.black.opacity(0.88))
-                                .multilineTextAlignment(.center)
-                                .lineSpacing(2)
-                                .padding(.horizontal, 18)
-                        )
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
-
-                    HStack(spacing: 12) {
-                        Text("Today (\(dayMonthFormatter.string(from: Date())))")
+                    ZStack(alignment: .topTrailing) {
+                        Text(todayDisplayDateLabel)
                             .font(.custom("SortsMillGoudy-Italic", size: 18))
                             .foregroundStyle(Color.black.opacity(0.84))
-                            .minimumScaleFactor(0.6)
+                            .minimumScaleFactor(0.7)
                             .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .center)
 
-                        Rectangle()
-                            .fill(Color.black.opacity(0.3))
-                            .frame(height: 1)
+                        if todayDisplayedPageCount > 1 {
+                            Text("\(todayDisplayedPageIndex + 1)/\(todayDisplayedPageCount)")
+                                .font(.custom("AvenirNext-Medium", size: 12))
+                                .foregroundStyle(Color.black.opacity(0.56))
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if isWritingToday {
+                            finishTodayEditing()
+                        }
                     }
 
                     if isWritingToday {
-                        TextEditor(text: todayJournalTextBinding)
+                        TextEditor(text: todayDraftPageTextBinding)
                             .font(.custom("AvenirNext-Regular", size: 14))
                             .foregroundStyle(Color.black.opacity(0.84))
                             .scrollContentBackground(.hidden)
-                            .frame(minHeight: 180)
+                            .scrollIndicators(.hidden)
+                            .scrollDisabled(true)
+                            .frame(maxWidth: .infinity, minHeight: 330, maxHeight: 330, alignment: .topLeading)
                             .padding(.horizontal, 10)
                             .padding(.top, 10)
                             .background(
@@ -2815,77 +3017,163 @@ struct ReflectJournalCoverSection: View {
                             )
                             .focused($isTodayEditorFocused)
 
-                        HStack {
-                            Spacer()
-                            Button("Done") {
-                                isWritingToday = false
-                                isTodayEditorFocused = false
+                        HStack(alignment: .bottom) {
+                            Button {
+                                guard todayDraftPageIndex > 0 else { return }
+                                triggerArrowHaptic()
+                                moveToDraftPage(todayDraftPageIndex - 1)
+                            } label: {
+                                Image(systemName: "arrow.left")
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundStyle(Color.black.opacity(todayDraftPageIndex > 0 ? 0.72 : 0.24))
+                                    .frame(width: 30, height: 30)
                             }
-                            .font(.custom("AvenirNext-Medium", size: 12))
-                            .foregroundStyle(Color.black.opacity(0.72))
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 12)
-                            .background(
-                                Capsule()
-                                    .fill(Color.black.opacity(0.06))
-                            )
+                            .buttonStyle(.plain)
+                            .disabled(todayDraftPageIndex == 0)
+
+                            Spacer()
+
+                            Button {
+                                guard todayDraftPageIndex < todayDraftPages.count - 1 else { return }
+                                triggerArrowHaptic()
+                                moveToDraftPage(todayDraftPageIndex + 1)
+                            } label: {
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundStyle(Color.black.opacity(todayDraftPageIndex < todayDraftPages.count - 1 ? 0.72 : 0.24))
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(todayDraftPageIndex >= todayDraftPages.count - 1)
                         }
+                        .padding(.horizontal, 2)
+
+                        Button {
+                            finishTodayEditing()
+                        } label: {
+                            Text("Done")
+                                .font(.custom("SortsMillGoudy-Regular", size: 20))
+                                .foregroundStyle(Color(red: 0.15, green: 0.23, blue: 0.16).opacity(0.95))
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 34)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                stops: [
+                                                    .init(color: Color(red: 0.98, green: 0.89, blue: 0.73), location: 0.0),
+                                                    .init(color: Color(red: 0.93, green: 0.91, blue: 0.69), location: 0.55),
+                                                    .init(color: Color(red: 0.88, green: 0.91, blue: 0.70), location: 1.0)
+                                                ],
+                                                startPoint: .bottomLeading,
+                                                endPoint: .topTrailing
+                                            )
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                .stroke(Color.white.opacity(0.68), lineWidth: 1)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.12), radius: 5, x: 0, y: 3)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, alignment: .center)
                     } else {
-                        Text(todayJournalBody)
+                        Text(todayCurrentPageText)
                             .font(.custom("AvenirNext-Regular", size: 13))
                             .foregroundStyle(Color.black.opacity(0.82))
                             .lineSpacing(3)
-                    }
+                            .frame(maxWidth: .infinity, minHeight: 330, maxHeight: 330, alignment: .topLeading)
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color.white.opacity(0.88))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                                    )
+                            )
+                            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .onTapGesture {
+                                activateWritingMode()
+                            }
 
-                    Spacer(minLength: 170)
+                        HStack(alignment: .bottom) {
+                            Button {
+                                guard todayCurrentPageIndex > 0 else { return }
+                                triggerArrowHaptic()
+                                todayPageIndex = todayCurrentPageIndex - 1
+                            } label: {
+                                Image(systemName: "arrow.left")
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundStyle(Color.black.opacity(todayCurrentPageIndex > 0 ? 0.72 : 0.24))
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(todayCurrentPageIndex == 0)
+
+                            Spacer()
+
+                            Button {
+                                guard todayCurrentPageIndex < todayJournalPages.count - 1 else { return }
+                                triggerArrowHaptic()
+                                todayPageIndex = todayCurrentPageIndex + 1
+                            } label: {
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundStyle(Color.black.opacity(todayCurrentPageIndex < todayJournalPages.count - 1 ? 0.72 : 0.24))
+                                    .frame(width: 30, height: 30)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(todayCurrentPageIndex >= todayJournalPages.count - 1)
+                        }
+                        .padding(.horizontal, 2)
+                    }
                 }
             }
 
         case .thisWeek:
             ReflectJournalPageCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("This week")
-                        .font(.custom("SortsMillGoudy-Italic", size: 24))
-                        .foregroundStyle(Color.black.opacity(0.84))
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(last7Dates, id: \.self) { date in
+                        let entry = entryForDate(date)
+                        let canOpenEntry = entry.map(hasWrittenContent) ?? false
 
-                    HStack(spacing: 10) {
-                        Text("\(monthDayFormatter.string(from: weekDates.first ?? Date())) - \(monthDayFormatter.string(from: weekDates.last ?? Date()))")
-                            .font(.custom("AvenirNext-Medium", size: 11))
-                            .foregroundStyle(Color.black.opacity(0.55))
-                        Rectangle()
-                            .fill(Color.black.opacity(0.2))
-                            .frame(height: 1)
-                    }
+                        HStack(alignment: .center, spacing: 8) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(weekdayFormatter.string(from: date)) (\(fullDayFormatter.string(from: date)))")
+                                    .font(.custom("SortsMillGoudy-Italic", size: 15))
+                                    .foregroundStyle(Color.black.opacity(0.84))
 
-                    VStack(spacing: 0) {
-                        ForEach(weekDates, id: \.self) { date in
-                            let entry = entryForDate(date)
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text("\(weekdayFormatter.string(from: date)) (\(dayMonthFormatter.string(from: date)))")
-                                        .font(.custom("AvenirNext-DemiBold", size: 12))
-                                        .foregroundStyle(Color.black.opacity(0.75))
-                                    Spacer()
-                                    if entry != nil {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundStyle(Color(red: 0.2, green: 0.45, blue: 0.28))
-                                    }
-                                }
-
-                                Text(weeklyLine(for: entry))
-                                    .font(.custom("AvenirNext-Regular", size: 12))
+                                Text(weeklyPromptLine(for: entry))
+                                    .font(.custom("Poppins-Regular", size: 12))
                                     .foregroundStyle(Color.black.opacity(0.78))
-                                    .lineLimit(2)
+                                    .lineLimit(1)
                             }
-                            .padding(.vertical, 10)
 
-                            if date != weekDates.last {
-                                Rectangle()
-                                    .fill(Color.black.opacity(0.08))
-                                    .frame(height: 1)
+                            Spacer(minLength: 4)
+
+                            Button {
+                                openPastEntryFromThisWeek(for: date, entry: entry)
+                            } label: {
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 17, weight: .regular))
+                                    .foregroundStyle(Color.black.opacity(canOpenEntry ? 0.68 : 0.24))
+                                    .frame(width: 28, height: 28)
                             }
+                            .buttonStyle(.plain)
+                            .disabled(!canOpenEntry)
                         }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.88))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(Color(red: 0.87, green: 0.9, blue: 0.81), lineWidth: 1)
+                                )
+                        )
                     }
                 }
             }
@@ -2894,22 +3182,12 @@ struct ReflectJournalCoverSection: View {
             ReflectJournalPastEntriesCalendar(
                 entries: $entries,
                 selectedEntryID: $selectedEntryID,
+                focusedDate: pastEntriesJumpDate,
+                autoOpenToken: pastEntriesAutoOpenToken,
                 preferredHeight: coverPanelHeight
             )
             .background(pageCardBackground)
         }
-    }
-
-    private var todayPromptLine: String {
-        guard let todayEntry = entryForDate(Date()) else {
-            return "I enjoyed ___."
-        }
-
-        let response = todayEntry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-        if response.isEmpty {
-            return ReflectJournalPrompt.displayPrompt(todayEntry.prompt)
-        }
-        return filledPromptString(todayEntry.prompt, with: response)
     }
 
     private var todayJournalBody: String {
@@ -2924,40 +3202,52 @@ struct ReflectJournalCoverSection: View {
         return body
     }
 
-    private var weekDates: [Date] {
-        guard let start = calendar.dateInterval(of: .weekOfYear, for: Date())?.start else { return [] }
-        return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    private var todayDisplayDateLabel: String {
+        todayFullDateFormatter.string(from: Date())
+    }
+
+    private var todayFullDateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.dateFormat = "EEEE (M/d/yyyy)"
+        return formatter
+    }
+
+    private var todayJournalPages: [String] {
+        paginateJournalText(todayJournalBody, maxCharactersPerPage: todayDraftPageCharacterLimit)
+    }
+
+    private var todayCurrentPageIndex: Int {
+        let lastIndex = max(0, todayJournalPages.count - 1)
+        return min(max(todayPageIndex, 0), lastIndex)
+    }
+
+    private var todayCurrentPageText: String {
+        todayJournalPages[todayCurrentPageIndex]
+    }
+
+    private var todayDisplayedPageCount: Int {
+        isWritingToday ? todayDraftPages.count : todayJournalPages.count
+    }
+
+    private var todayDisplayedPageIndex: Int {
+        isWritingToday ? todayDraftPageIndex : todayCurrentPageIndex
+    }
+
+    private var last7Dates: [Date] {
+        let today = calendar.startOfDay(for: Date())
+        return (0..<7).compactMap { offset in
+            calendar.date(byAdding: .day, value: -offset, to: today)
+        }
     }
 
     private func entryForDate(_ date: Date) -> ReflectJournalEntry? {
         entries.first { calendar.isDate($0.date, inSameDayAs: date) }
     }
 
-    private var todayJournalTextBinding: Binding<String> {
-        Binding(
-            get: {
-                entryForDate(Date())?.journalText ?? ""
-            },
-            set: { newValue in
-                upsertTodayJournalText(newValue)
-            }
-        )
-    }
-
-    private func weeklyLine(for entry: ReflectJournalEntry?) -> String {
-        guard let entry else { return "No entry yet." }
-
-        let journal = entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !journal.isEmpty {
-            return journal
-        }
-
-        let response = entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !response.isEmpty {
-            return filledPromptString(entry.prompt, with: response)
-        }
-
-        return ReflectJournalPrompt.displayPrompt(entry.prompt)
+    private func weeklyPromptLine(for entry: ReflectJournalEntry?) -> String {
+        guard let entry else { return "No prompt yet." }
+        return ReflectJournalPrompt.filledPromptString(entry.prompt, with: entry.promptResponse)
     }
 
     private var weekdayFormatter: DateFormatter {
@@ -2967,21 +3257,30 @@ struct ReflectJournalCoverSection: View {
         return formatter
     }
 
-    private var dayMonthFormatter: DateFormatter {
+    private var fullDayFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale.current
-        formatter.dateFormat = "M/d"
+        formatter.dateFormat = "M/d/yyyy"
         return formatter
     }
 
-    private var monthDayFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.dateFormat = "MMM d"
-        return formatter
+    private var todayDraftPageTextBinding: Binding<String> {
+        Binding(
+            get: {
+                let safeIndex = min(max(todayDraftPageIndex, 0), max(0, todayDraftPages.count - 1))
+                return todayDraftPages[safeIndex]
+            },
+            set: { newValue in
+                updateTodayDraftPageText(newValue)
+            }
+        )
     }
 
     private func activateWritingMode() {
+        let existingText = entryForDate(Date())?.journalText ?? ""
+        let pages = paginateJournalText(existingText, maxCharactersPerPage: todayDraftPageCharacterLimit)
+        todayDraftPages = pages.isEmpty ? [""] : pages
+        todayDraftPageIndex = max(0, todayDraftPages.count - 1)
         withAnimation(.easeInOut(duration: 0.2)) {
             isOpen = true
             selectedTab = .today
@@ -2989,6 +3288,46 @@ struct ReflectJournalCoverSection: View {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             isTodayEditorFocused = true
+        }
+    }
+
+    private func finishTodayEditing() {
+        guard isWritingToday else { return }
+        let mergedText = todayDraftPages
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+        upsertTodayJournalText(mergedText)
+        isWritingToday = false
+        isTodayEditorFocused = false
+        todayPageIndex = 0
+    }
+
+    private func openPastEntryFromThisWeek(for date: Date, entry: ReflectJournalEntry?) {
+        guard let entry, hasWrittenContent(entry) else { return }
+        selectedEntryID = entry.id
+        pastEntriesJumpDate = date
+        pastEntriesAutoOpenToken = UUID()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            selectedTab = .pastEntries
+        }
+    }
+
+    private func handleExternalOpenRequest() {
+        guard let token = externalOpenTokenValue else { return }
+        guard token != handledExternalOpenToken else { return }
+        guard let targetDate = externalOpenDateValue else { return }
+        handledExternalOpenToken = token
+
+        if isWritingToday {
+            finishTodayEditing()
+        }
+        selectedEntryID = entryForDate(targetDate)?.id
+        pastEntriesJumpDate = targetDate
+        pastEntriesAutoOpenToken = token
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isOpen = true
+            selectedTab = .pastEntries
         }
     }
 
@@ -3009,17 +3348,119 @@ struct ReflectJournalCoverSection: View {
         selectedEntryID = newEntry.id
     }
 
-    private func filledPromptString(_ prompt: String, with entry: String) -> String {
-        let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return ReflectJournalPrompt.displayPrompt(prompt) }
+    private func moveToDraftPage(_ index: Int) {
+        let safeIndex = min(max(index, 0), max(0, todayDraftPages.count - 1))
+        todayDraftPageIndex = safeIndex
+    }
 
-        if prompt.contains("...") {
-            return prompt.replacingOccurrences(of: "...", with: trimmed)
+    private func updateTodayDraftPageText(_ newValue: String) {
+        guard !todayDraftPages.isEmpty else {
+            todayDraftPages = [newValue]
+            todayDraftPageIndex = 0
+            return
         }
-        if prompt.contains("_____") {
-            return prompt.replacingOccurrences(of: "_____", with: trimmed)
+
+        let safeIndex = min(max(todayDraftPageIndex, 0), todayDraftPages.count - 1)
+        var updatedPages = todayDraftPages
+        updatedPages[safeIndex] = newValue
+        let normalized = normalizeDraftPages(updatedPages)
+        let didOverflow = newValue.count > todayDraftPageCharacterLimit && safeIndex < normalized.count - 1
+
+        todayDraftPages = normalized
+        if didOverflow {
+            moveToDraftPage(safeIndex + 1)
+            triggerArrowHaptic()
+        } else {
+            moveToDraftPage(safeIndex)
         }
-        return "\(prompt) \(trimmed)"
+    }
+
+    private func normalizeDraftPages(_ pages: [String]) -> [String] {
+        var normalized = pages
+        var index = 0
+        while index < normalized.count {
+            let page = normalized[index]
+            guard page.count > todayDraftPageCharacterLimit else {
+                index += 1
+                continue
+            }
+
+            let split = splitPage(page, limit: todayDraftPageCharacterLimit)
+            normalized[index] = split.current
+            if index + 1 < normalized.count {
+                let suffix = normalized[index + 1]
+                normalized[index + 1] = split.overflow + (suffix.isEmpty ? "" : " " + suffix)
+            } else {
+                normalized.append(split.overflow)
+            }
+        }
+
+        while normalized.count > 1 &&
+                normalized.last?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+            normalized.removeLast()
+        }
+        return normalized.isEmpty ? [""] : normalized
+    }
+
+    private func splitPage(_ text: String, limit: Int) -> (current: String, overflow: String) {
+        guard text.count > limit else { return (text, "") }
+
+        let hardSplit = text.index(text.startIndex, offsetBy: limit)
+        let prefixRange = text.startIndex..<hardSplit
+        let splitIndex: String.Index
+
+        if let whitespace = text[prefixRange].lastIndex(where: { $0.isWhitespace }) {
+            splitIndex = text.index(after: whitespace)
+        } else {
+            splitIndex = hardSplit
+        }
+
+        let current = String(text[..<splitIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let overflow = String(text[splitIndex...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if current.isEmpty {
+            return (
+                String(text[..<hardSplit]).trimmingCharacters(in: .whitespacesAndNewlines),
+                String(text[hardSplit...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }
+        return (current, overflow)
+    }
+
+    private func hasWrittenContent(_ entry: ReflectJournalEntry) -> Bool {
+        !entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func paginateJournalText(_ text: String, maxCharactersPerPage: Int) -> [String] {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return [""] }
+
+        var pages: [String] = []
+        var currentPage = ""
+        let words = cleaned.split(whereSeparator: \.isWhitespace)
+
+        for word in words {
+            let token = String(word)
+            let candidate = currentPage.isEmpty ? token : "\(currentPage) \(token)"
+            if candidate.count > maxCharactersPerPage && !currentPage.isEmpty {
+                pages.append(currentPage)
+                currentPage = token
+            } else {
+                currentPage = candidate
+            }
+        }
+
+        if !currentPage.isEmpty {
+            pages.append(currentPage)
+        }
+
+        return pages.isEmpty ? [cleaned] : pages
+    }
+
+    private func triggerArrowHaptic() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.85)
     }
 }
 
@@ -3044,117 +3485,213 @@ private struct ReflectJournalPageCard<Content: View>: View {
 private struct ReflectJournalPastEntriesCalendar: View {
     @Binding var entries: [ReflectJournalEntry]
     @Binding var selectedEntryID: UUID?
+    let focusedDate: Date?
+    let autoOpenToken: UUID?
     let preferredHeight: CGFloat
 
     @State private var displayedMonth: Date = Date()
     @State private var selectedDate: Date = Date()
+    @State private var openedEntryDate: Date? = nil
+    @State private var openedEntryPageIndex: Int = 0
+    @State private var handledAutoOpenToken: UUID? = nil
     private let calendar = Calendar.current
     private let dayOutlineColor = Color(red: 0.82, green: 0.86, blue: 0.71)
 
     var body: some View {
         ReflectJournalPageCard {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    monthArrowButton(systemName: "chevron.left", direction: -1)
-                    Spacer()
-                    Text(monthFormatter.string(from: displayedMonth))
-                        .font(.custom("SortsMillGoudy-Italic", size: 30))
-                        .foregroundStyle(Color.black.opacity(0.78))
-                    Spacer()
-                    monthArrowButton(systemName: "chevron.right", direction: 1)
+            Group {
+                if let openedEntryDate {
+                    readOnlyEntryContent(for: openedEntryDate)
+                } else {
+                    calendarContent
                 }
-                .padding(.horizontal, 2)
-
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7),
-                    spacing: 10
-                ) {
-                    ForEach(monthGridItems(for: displayedMonth)) { item in
-                        if let day = item.day {
-                            let date = dateForDay(day, in: displayedMonth)
-                            let entry = date.flatMap(entryForDate)
-                            let hasEntry = entry.map(hasWrittenContent) ?? false
-                            let isSelected = date.map { calendar.isDate($0, inSameDayAs: selectedDate) } ?? false
-
-                            Button {
-                                guard let date else { return }
-                                selectedDate = date
-                                selectedEntryID = entry?.id
-                            } label: {
-                                ZStack {
-                                    Circle()
-                                        .fill(hasEntry ? AnyShapeStyle(entryDayGradient) : AnyShapeStyle(Color.white))
-                                        .frame(width: 40, height: 40)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(
-                                                    isSelected ? Color.black.opacity(0.35) : dayOutlineColor,
-                                                    style: StrokeStyle(
-                                                        lineWidth: isSelected ? 1.2 : 1,
-                                                        dash: hasEntry ? [] : [4, 4]
-                                                    )
-                                                )
-                                        )
-                                        .shadow(
-                                            color: hasEntry ? Color.black.opacity(0.1) : .clear,
-                                            radius: 5,
-                                            x: 0,
-                                            y: 3
-                                        )
-
-                                    Text("\(day)")
-                                        .font(.custom("AvenirNext-DemiBold", size: 18))
-                                        .foregroundStyle(Color.black.opacity(0.72))
-                                }
-                                .contentShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            Circle()
-                                .stroke(dayOutlineColor, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                                .frame(width: 40, height: 40)
-                                .opacity(0.7)
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(entryDateFormatter.string(from: selectedDate))
-                        .font(.custom("AvenirNext-Medium", size: 12))
-                        .foregroundStyle(Color.black.opacity(0.56))
-
-                    if let entry = entryForDate(selectedDate) {
-                        Text(journalText(for: entry))
-                            .font(.custom("AvenirNext-Regular", size: 14))
-                            .foregroundStyle(Color.black.opacity(0.84))
-                            .lineSpacing(2)
-                            .multilineTextAlignment(.leading)
-                    } else {
-                        Text("No journal entry for this day.")
-                            .font(.custom("AvenirNext-Regular", size: 14))
-                            .foregroundStyle(Color.black.opacity(0.52))
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.9))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                )
-
-                Spacer(minLength: 0)
             }
         }
         .frame(height: preferredHeight)
         .onAppear {
-            let initialDate = latestEntryDate() ?? Date()
-            selectedDate = initialDate
-            displayedMonth = monthStart(for: initialDate)
-            selectedEntryID = entryForDate(initialDate)?.id
+            focusOnDate(focusedDate ?? latestEntryDate() ?? Date())
+            handleAutoOpenIfNeeded()
+        }
+        .onChange(of: focusedDate) { date in
+            guard let date else { return }
+            focusOnDate(date)
+            handleAutoOpenIfNeeded()
+        }
+        .onChange(of: autoOpenToken) { _ in
+            handleAutoOpenIfNeeded()
+        }
+    }
+
+    private var calendarContent: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                monthArrowButton(systemName: "chevron.left", direction: -1)
+
+                Spacer(minLength: 6)
+                Text(monthYearFormatter.string(from: displayedMonth))
+                    .font(.custom("SortsMillGoudy-Italic", size: 24))
+                    .foregroundStyle(Color(red: 0.18, green: 0.08, blue: 0.08))
+                Spacer(minLength: 6)
+
+                monthArrowButton(systemName: "chevron.right", direction: 1)
+            }
+            .font(.system(size: 16, weight: .medium))
+            .foregroundStyle(Color.black.opacity(0.75))
+
+            HStack {
+                ForEach(["Su", "M", "Tu", "W", "Th", "F", "S"], id: \.self) { day in
+                    Text(day)
+                        .font(.custom("Poppins-Regular", size: 11))
+                        .foregroundStyle(Color.black.opacity(0.85))
+                        .tracking(0.6)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.bottom, 2)
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible()), count: 7),
+                spacing: 12
+            ) {
+                let calendarCellHeight: CGFloat = 42
+                ForEach(Array(monthGridItems(for: displayedMonth).enumerated()), id: \.offset) { _, item in
+                    if let day = item.day {
+                        let date = dateForDay(day, in: displayedMonth)
+                        let entry = date.flatMap(entryForDate)
+                        let hasEntry = entry.map(hasWrittenContent) ?? false
+                        let isSelected = date.map { calendar.isDate($0, inSameDayAs: selectedDate) } ?? false
+
+                        Button {
+                            guard let date else { return }
+                            selectedDate = date
+                            selectedEntryID = entry?.id
+                            if hasEntry {
+                                openEntry(for: date)
+                            }
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(hasEntry ? AnyShapeStyle(entryDayGradient) : AnyShapeStyle(Color.white))
+                                    .frame(width: 36, height: 36)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                isSelected ? Color.black.opacity(0.35) : dayOutlineColor,
+                                                style: StrokeStyle(
+                                                    lineWidth: isSelected ? 1.2 : 1,
+                                                    dash: hasEntry ? [] : [4, 4]
+                                                )
+                                            )
+                                    )
+                                    .shadow(
+                                        color: hasEntry ? Color.black.opacity(0.1) : .clear,
+                                        radius: 4,
+                                        x: 0,
+                                        y: 2
+                                    )
+
+                                Text("\(day)")
+                                    .font(.custom("Poppins-Regular", size: 16))
+                                    .foregroundStyle(Color.black.opacity(0.72))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, minHeight: calendarCellHeight, maxHeight: calendarCellHeight)
+                    } else {
+                        Color.clear
+                            .frame(maxWidth: .infinity, minHeight: 42, maxHeight: 42)
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func readOnlyEntryContent(for date: Date) -> some View {
+        let entry = entryForDate(date)
+        let pages = pagesForEntry(entry)
+        let currentPage = min(max(openedEntryPageIndex, 0), max(0, pages.count - 1))
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 8) {
+                Button {
+                    triggerArrowHaptic()
+                    openedEntryDate = nil
+                    openedEntryPageIndex = 0
+                } label: {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundStyle(Color.black.opacity(0.72))
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text(readOnlyDateFormatter.string(from: date))
+                    .font(.custom("SortsMillGoudy-Italic", size: 18))
+                    .foregroundStyle(Color.black.opacity(0.84))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                Spacer()
+
+                if pages.count > 1 {
+                    Text("\(currentPage + 1)/\(pages.count)")
+                        .font(.custom("AvenirNext-Medium", size: 12))
+                        .foregroundStyle(Color.black.opacity(0.56))
+                        .frame(width: 42, alignment: .trailing)
+                } else {
+                    Color.clear.frame(width: 42, height: 1)
+                }
+            }
+
+            Text(pages[currentPage])
+                .font(.custom("AvenirNext-Regular", size: 13))
+                .foregroundStyle(Color.black.opacity(0.82))
+                .lineSpacing(3)
+                .frame(maxWidth: .infinity, minHeight: 330, maxHeight: 330, alignment: .topLeading)
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(0.88))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        )
+                )
+
+            HStack(alignment: .bottom) {
+                Button {
+                    guard currentPage > 0 else { return }
+                    triggerArrowHaptic()
+                    openedEntryPageIndex = currentPage - 1
+                } label: {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundStyle(Color.black.opacity(currentPage > 0 ? 0.72 : 0.24))
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .disabled(currentPage == 0)
+
+                Spacer()
+
+                Button {
+                    guard currentPage < pages.count - 1 else { return }
+                    triggerArrowHaptic()
+                    openedEntryPageIndex = currentPage + 1
+                } label: {
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundStyle(Color.black.opacity(currentPage < pages.count - 1 ? 0.72 : 0.24))
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .disabled(currentPage >= pages.count - 1)
+            }
+            .padding(.horizontal, 2)
         }
     }
 
@@ -3170,39 +3707,33 @@ private struct ReflectJournalPastEntriesCalendar: View {
         )
     }
 
-    private var monthFormatter: DateFormatter {
+    private var monthYearFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale.current
-        formatter.dateFormat = "LLLL"
+        formatter.dateFormat = "LLLL yyyy"
         return formatter
     }
 
-    private var entryDateFormatter: DateFormatter {
+    private var readOnlyDateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale.current
-        formatter.dateFormat = "EEEE, MMM d"
+        formatter.dateFormat = "EEEE (M/d/yyyy)"
         return formatter
     }
 
     private func monthArrowButton(systemName: String, direction: Int) -> some View {
         Button {
+            triggerArrowHaptic()
             guard let updated = calendar.date(byAdding: .month, value: direction, to: displayedMonth) else { return }
             displayedMonth = monthStart(for: updated)
             selectedDate = monthStart(for: updated)
             selectedEntryID = entryForDate(selectedDate)?.id
+            openedEntryDate = nil
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Color.black.opacity(0.74))
-                .frame(width: 36, height: 36)
-                .background(
-                    Circle()
-                        .fill(Color.white.opacity(0.85))
-                        .overlay(
-                            Circle()
-                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                        )
-                )
+                .frame(width: 34, height: 34)
         }
         .buttonStyle(.plain)
     }
@@ -3251,6 +3782,31 @@ private struct ReflectJournalPastEntriesCalendar: View {
             .first
     }
 
+    private func focusOnDate(_ date: Date) {
+        selectedDate = date
+        displayedMonth = monthStart(for: date)
+        selectedEntryID = entryForDate(date)?.id
+        openedEntryDate = nil
+        openedEntryPageIndex = 0
+    }
+
+    private func openEntry(for date: Date) {
+        guard let entry = entryForDate(date), hasWrittenContent(entry) else { return }
+        triggerArrowHaptic()
+        selectedDate = date
+        selectedEntryID = entry.id
+        openedEntryDate = date
+        openedEntryPageIndex = 0
+    }
+
+    private func handleAutoOpenIfNeeded() {
+        guard let autoOpenToken, autoOpenToken != handledAutoOpenToken else { return }
+        handledAutoOpenToken = autoOpenToken
+        guard let focusedDate else { return }
+        focusOnDate(focusedDate)
+        openEntry(for: focusedDate)
+    }
+
     private func hasWrittenContent(_ entry: ReflectJournalEntry) -> Bool {
         !entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !entry.journalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -3264,23 +3820,48 @@ private struct ReflectJournalPastEntriesCalendar: View {
 
         let response = entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
         if !response.isEmpty {
-            return filledPromptString(entry.prompt, with: response)
+            return ReflectJournalPrompt.filledPromptString(entry.prompt, with: response)
         }
 
         return ReflectJournalPrompt.displayPrompt(entry.prompt)
     }
 
-    private func filledPromptString(_ prompt: String, with entry: String) -> String {
-        let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return ReflectJournalPrompt.displayPrompt(prompt) }
+    private func pagesForEntry(_ entry: ReflectJournalEntry?) -> [String] {
+        guard let entry else { return ["No journal entry for this day."] }
+        let content = journalText(for: entry)
+        return paginateJournalText(content, maxCharactersPerPage: 470)
+    }
 
-        if prompt.contains("...") {
-            return prompt.replacingOccurrences(of: "...", with: trimmed)
+    private func paginateJournalText(_ text: String, maxCharactersPerPage: Int) -> [String] {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return [""] }
+
+        var pages: [String] = []
+        var currentPage = ""
+        let words = cleaned.split(whereSeparator: \.isWhitespace)
+
+        for word in words {
+            let token = String(word)
+            let candidate = currentPage.isEmpty ? token : "\(currentPage) \(token)"
+            if candidate.count > maxCharactersPerPage && !currentPage.isEmpty {
+                pages.append(currentPage)
+                currentPage = token
+            } else {
+                currentPage = candidate
+            }
         }
-        if prompt.contains("_____") {
-            return prompt.replacingOccurrences(of: "_____", with: trimmed)
+
+        if !currentPage.isEmpty {
+            pages.append(currentPage)
         }
-        return "\(prompt) \(trimmed)"
+
+        return pages.isEmpty ? [cleaned] : pages
+    }
+
+    private func triggerArrowHaptic() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.85)
     }
 }
 
@@ -3294,25 +3875,6 @@ struct ReflectMoodDayDisplay: Identifiable {
     let dayLabel: String
     let dateLabel: String
     let mood: ReflectMoodOption?
-}
-
-enum JournalTag: String, CaseIterable, Identifiable, Hashable {
-    case reflection = "Reflection"
-    case work = "Work"
-    case creativity = "Creativity"
-    case rest = "Rest"
-
-    var id: String { rawValue }
-    var title: String { rawValue }
-
-    var color: Color {
-        switch self {
-        case .reflection: return Color(red: 0.16, green: 0.3, blue: 0.22)
-        case .work: return Color(red: 0.22, green: 0.24, blue: 0.45)
-        case .creativity: return Color(red: 0.6, green: 0.33, blue: 0.2)
-        case .rest: return Color(red: 0.28, green: 0.44, blue: 0.5)
-        }
-    }
 }
 
 struct ReflectJournalEntry: Identifiable, Codable, Equatable {
@@ -3402,10 +3964,30 @@ struct ReflectJournalPrompt {
         if prompt.contains("...") {
             return prompt.replacingOccurrences(of: "...", with: "_____")
         }
-        if prompt.contains("_____") {
+        if prompt.range(of: #"_{3,}"#, options: .regularExpression) != nil {
             return prompt
         }
         return prompt
+    }
+
+    static func filledPromptString(_ prompt: String, with entry: String) -> String {
+        let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return displayPrompt(prompt) }
+
+        if prompt.contains("...") {
+            return prompt.replacingOccurrences(of: "...", with: trimmed)
+        }
+
+        let replaced = prompt.replacingOccurrences(
+            of: #"_{3,}"#,
+            with: trimmed,
+            options: .regularExpression
+        )
+        if replaced != prompt {
+            return replaced
+        }
+
+        return "\(prompt) \(trimmed)"
     }
 
     static func promptFontSize(for prompt: String) -> CGFloat {
@@ -3428,7 +4010,7 @@ struct ReflectJournalPrompt {
             return Text(prefix) + Text(trimmed).underline() + Text(suffix)
         }
 
-        if let range = prompt.range(of: "_____") {
+        if let range = prompt.range(of: #"_{3,}"#, options: .regularExpression) {
             let prefix = String(prompt[..<range.lowerBound])
             let suffix = String(prompt[range.upperBound...])
             return Text(prefix) + Text(trimmed).underline() + Text(suffix)
@@ -3459,36 +4041,6 @@ struct ReflectJournalStore {
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(entries) else { return }
         UserDefaults.standard.set(data, forKey: entriesKey)
-    }
-}
-
-struct ReflectJournalTagStore {
-    private struct TagRecord: Codable {
-        let id: UUID
-        let tags: [String]
-    }
-
-    private static let tagsKey = "reflect.journal.tags"
-
-    static func loadTags() -> [UUID: Set<JournalTag>] {
-        guard let data = UserDefaults.standard.data(forKey: tagsKey) else { return [:] }
-        let decoder = JSONDecoder()
-        guard let records = try? decoder.decode([TagRecord].self, from: data) else { return [:] }
-        var results: [UUID: Set<JournalTag>] = [:]
-        for record in records {
-            let tags = record.tags.compactMap { JournalTag(rawValue: $0) }
-            results[record.id] = Set(tags)
-        }
-        return results
-    }
-
-    static func saveTags(_ tagsByID: [UUID: Set<JournalTag>]) {
-        let records = tagsByID.map { id, tags in
-            TagRecord(id: id, tags: tags.map(\.rawValue))
-        }
-        let encoder = JSONEncoder()
-        guard let data = try? encoder.encode(records) else { return }
-        UserDefaults.standard.set(data, forKey: tagsKey)
     }
 }
 
@@ -3619,6 +4171,9 @@ struct MoodLevelRow: View {
 
 struct MoodLevelBar: View {
     @Binding var value: Double
+    @State private var feedbackGenerator = UISelectionFeedbackGenerator()
+    @State private var impactGenerator = UIImpactFeedbackGenerator(style: .soft)
+    @State private var lastHapticBucket: Int = -1
 
     var body: some View {
         GeometryReader { proxy in
@@ -3662,8 +4217,25 @@ struct MoodLevelBar: View {
                         let clampedX = min(max(gesture.location.x, 0), width)
                         let rawValue = Double(clampedX / max(width, 1))
                         value = min(max(rawValue, 0), 1)
+
+                        // Fire light haptics as the thumb crosses small value buckets.
+                        let bucket = Int((value * 20).rounded())
+                        if bucket != lastHapticBucket {
+                            feedbackGenerator.selectionChanged()
+                            feedbackGenerator.prepare()
+                            lastHapticBucket = bucket
+                        }
+                    }
+                    .onEnded { _ in
+                        impactGenerator.impactOccurred(intensity: 0.4)
+                        impactGenerator.prepare()
+                        lastHapticBucket = -1
                     }
             )
+            .onAppear {
+                feedbackGenerator.prepare()
+                impactGenerator.prepare()
+            }
         }
     }
 }
@@ -3799,8 +4371,11 @@ extension DailyMoodView {
         else { return [] }
 
         let weekdayIndex = calendar.component(.weekday, from: firstOfMonth) - 1
-        let padding = Array(repeating: 0, count: weekdayIndex)
-        return padding + Array(range)
+        var days = Array(repeating: 0, count: weekdayIndex) + Array(range)
+        while days.count < 42 {
+            days.append(0)
+        }
+        return days
     }
 
     private func moodForDay(_ day: Int, in month: Date) -> ReflectMoodOption? {
@@ -3814,6 +4389,12 @@ extension DailyMoodView {
     private func moodForDate(_ date: Date) -> ReflectMoodOption? {
         let key = ReflectDateKey(date: date, calendar: calendar)
         return loggedMoods[key]
+    }
+
+    private func triggerArrowHaptic() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.85)
     }
 
     private func mostFrequentMood(in entries: [(ReflectDateKey, ReflectMoodOption)]) -> ReflectMoodOption? {
