@@ -7,6 +7,14 @@ import SwiftUI
 import UIKit
 
 private let reflectLandingMoodCardHeight: CGFloat = 228
+private enum ReflectPalette {
+    static let primaryGreen = Color(red: 47.0 / 255.0, green: 61.0 / 255.0, blue: 37.0 / 255.0)
+    static let secondaryGreen = Color(red: 106.0 / 255.0, green: 119.0 / 255.0, blue: 97.0 / 255.0)
+    static let lightGreen = Color(red: 228.0 / 255.0, green: 236.0 / 255.0, blue: 199.0 / 255.0)
+    static let brown = Color(red: 81.0 / 255.0, green: 59.0 / 255.0, blue: 55.0 / 255.0)
+    static let lightBrown = Color(red: 179.0 / 255.0, green: 144.0 / 255.0, blue: 144.0 / 255.0)
+    static let warmWhite = Color(red: 1.0, green: 254.0 / 255.0, blue: 249.0 / 255.0)
+}
 
 private struct ReflectTabBackground: View {
     var body: some View {
@@ -59,7 +67,7 @@ enum ReflectLandingSection: String, CaseIterable, Identifiable {
     case overview = "Overview"
     case dailyMood = "Daily Mood"
     case journal = "Journal"
-    case patternsTrends = "Patterns & Trends"
+    case patternsTrends = "Trends"
 
     var id: String { rawValue }
 }
@@ -76,9 +84,9 @@ struct ReflectView: View {
     @State private var journalDeepLinkToken: UUID? = nil
     private let topScrollID = "reflect.top.scroll.id"
     private let calendar = Calendar.current
-    private let tabBarColor = Color(red: 0.97, green: 0.97, blue: 0.97)
-    private let inkColor = Color(red: 0.12, green: 0.12, blue: 0.12)
-    private let accentColor = Color(red: 0.15, green: 0.25, blue: 0.2)
+    private let tabBarColor = ReflectPalette.warmWhite
+    private let inkColor = ReflectPalette.brown
+    private let accentColor = ReflectPalette.primaryGreen
 
     private var todayMood: ReflectMoodOption? {
         moodForDate(Date())
@@ -105,7 +113,7 @@ struct ReflectView: View {
     private var yesterdayJournalExcerpt: String {
         guard let entry = yesterdayJournalEntry else { return "No journal entry from yesterday." }
         let text = journalPreviewText(for: entry)
-        return shortenedOverviewExcerpt(text, maxLength: 145)
+        return shortenedOverviewExcerpt(text, maxLength: 115)
     }
 
     private var moodStreakDays: Int {
@@ -166,7 +174,15 @@ struct ReflectView: View {
     private func shortenedOverviewExcerpt(_ text: String, maxLength: Int) -> String {
         let condensed = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         guard condensed.count > maxLength else { return condensed }
-        return "\(condensed.prefix(maxLength))..."
+        let cutoffIndex = condensed.index(condensed.startIndex, offsetBy: maxLength)
+        let leadingChunk = String(condensed[..<cutoffIndex])
+        if let lastWordBoundary = leadingChunk.lastIndex(where: \.isWhitespace) {
+            let trimmed = leadingChunk[..<lastWordBoundary].trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return "\(trimmed)..."
+            }
+        }
+        return "\(leadingChunk)..."
     }
 
     private func openYesterdayJournalEntry() {
@@ -242,7 +258,7 @@ struct ReflectView: View {
                             .background(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     .fill(Color.white.opacity(0.96))
-                                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -327,38 +343,42 @@ struct ReflectView: View {
             }
 
             if let yesterdayMood {
-                let reflectionRowHeight: CGFloat = 214
+                let reflectionRowHeight: CGFloat = reflectLandingMoodCardHeight
                 HStack(alignment: .top, spacing: 10) {
-                    VStack(alignment: .center, spacing: 10) {
-                        Text("Reflect on yesterday:")
-                            .font(.custom("SortsMillGoudy-Italic", size: 22))
-                            .foregroundStyle(inkColor.opacity(0.92))
-                            .multilineTextAlignment(.center)
+                    ReflectDailyMoodOverviewCard(minHeight: reflectionRowHeight, horizontalPadding: 12) {
+                        VStack(alignment: .center, spacing: 10) {
+                            Text("Reflect on yesterday:")
+                                .font(.custom("SortsMillGoudy-Italic", size: 20))
+                                .foregroundStyle(inkColor.opacity(0.92))
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .layoutPriority(1)
+                                .frame(maxWidth: .infinity, alignment: .center)
+
+                            Text(yesterdayJournalExcerpt)
+                                .font(.custom("Poppins-Regular", size: 14))
+                                .foregroundStyle(inkColor.opacity(0.88))
+                                .lineSpacing(2)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(5)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .center)
+
+                            Spacer(minLength: 0)
+
+                            Button {
+                                openYesterdayJournalEntry()
+                            } label: {
+                                ReflectOutlineActionButton(title: "See More")
+                            }
+                            .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, alignment: .center)
-
-                        Text(yesterdayJournalExcerpt)
-                            .font(.custom("Poppins-Regular", size: 14))
-                            .foregroundStyle(inkColor.opacity(0.88))
-                            .lineSpacing(2)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(6)
-                            .truncationMode(.tail)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .center)
-
-                        Spacer(minLength: 0)
-
-                        Button {
-                            openYesterdayJournalEntry()
-                        } label: {
-                            ReflectOutlineActionButton(title: "See More")
+                            .disabled(yesterdayJournalEntry == nil)
+                            .opacity(yesterdayJournalEntry == nil ? 0.45 : 1)
                         }
-                        .buttonStyle(.plain)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .disabled(yesterdayJournalEntry == nil)
-                        .opacity(yesterdayJournalEntry == nil ? 0.45 : 1)
                     }
-                    .frame(maxWidth: .infinity, minHeight: reflectionRowHeight, maxHeight: reflectionRowHeight, alignment: .top)
+                    .frame(maxWidth: .infinity, alignment: .top)
 
                     ReflectYesterdayMoodSummary(
                         mood: yesterdayMood,
@@ -425,7 +445,7 @@ struct ReflectView: View {
 
     private var patternsOverviewSection: some View {
         VStack(spacing: 22) {
-            ReflectSectionTitle(text: "Patterns & Trends", leadingAssetName: "planet2")
+            ReflectSectionTitle(text: "Trends", leadingAssetName: "planet2")
             VStack(spacing: 14) {
                 ReflectPatternsPreviewChart(scores: past7DayMoodScores)
                     .frame(height: 250)
@@ -492,7 +512,7 @@ struct ReflectLandingTabs: View {
     let onSelect: (ReflectLandingSection) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 20) {
             ForEach(ReflectLandingSection.allCases) { section in
                 Button {
                     onSelect(section)
@@ -503,14 +523,12 @@ struct ReflectLandingTabs: View {
                     )
                 }
                 .buttonStyle(.plain)
-                .frame(maxWidth: .infinity)
             }
         }
-        .padding(.leading, -3)
-        .padding(.trailing, 3)
+        .padding(.horizontal, 2)
         .padding(.top, 2)
         .padding(.bottom, 2)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
@@ -521,12 +539,10 @@ struct ReflectLandingTabChip: View {
     var body: some View {
         Text(title)
             .font(.custom("Poppins-Regular", size: 11))
-            .foregroundStyle(Color(red: 0.2, green: 0.28, blue: 0.22).opacity(0.96))
+            .foregroundStyle(ReflectPalette.secondaryGreen.opacity(0.96))
             .lineLimit(1)
-            .minimumScaleFactor(0.58)
-            .allowsTightening(true)
             .padding(.vertical, 6)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 14)
             .frame(minHeight: 39)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -547,9 +563,9 @@ struct ReflectLandingTabChip: View {
                     )
                     .shadow(
                         color: isSelected ? Color.black.opacity(0.08) : Color.black.opacity(0.06),
-                        radius: isSelected ? 2.8 : 2.2,
+                        radius: 4,
                         x: 0,
-                        y: 0.8
+                        y: 3
                     )
                     .shadow(
                         color: Color.white.opacity(isSelected ? 0.55 : 0.25),
@@ -562,7 +578,7 @@ struct ReflectLandingTabChip: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(
                         isSelected
-                        ? Color(red: 0.86, green: 0.88, blue: 0.79).opacity(0.9)
+                        ? ReflectPalette.lightGreen.opacity(0.9)
                         : Color.white.opacity(0.72),
                         lineWidth: 1
                     )
@@ -586,14 +602,10 @@ private struct ReflectActionButton: View {
     }
 
     private var buttonLabel: some View {
-        HStack(spacing: 8) {
-            Image("pencil")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 15, height: 15)
+        HStack(spacing: 0) {
             Text(title)
                 .font(.custom("SortsMillGoudy-Regular", size: 16))
-                .foregroundStyle(Color(red: 0.15, green: 0.23, blue: 0.16).opacity(0.95))
+                .foregroundStyle(ReflectPalette.secondaryGreen.opacity(0.95))
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 20)
@@ -614,7 +626,7 @@ private struct ReflectActionButton: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(Color.white.opacity(0.68), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.12), radius: 5, x: 0, y: 3)
+                .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 3)
         )
     }
 }
@@ -623,11 +635,7 @@ private struct ReflectOutlineActionButton: View {
     let title: String
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image("pencil")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 14, height: 14)
+        HStack(spacing: 0) {
             Text(title)
                 .font(.custom("SortsMillGoudy-Regular", size: 16))
                 .foregroundStyle(Color.black.opacity(0.86))
@@ -639,9 +647,9 @@ private struct ReflectOutlineActionButton: View {
                 .fill(Color.white.opacity(0.96))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color(red: 0.86, green: 0.88, blue: 0.79), lineWidth: 1)
+                        .stroke(ReflectPalette.lightGreen, lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 3)
+                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
         )
     }
 }
@@ -813,49 +821,69 @@ private struct ReflectPatternsPreviewChart: View {
     }
 }
 
+private struct ReflectDailyMoodOverviewCard<Content: View>: View {
+    let minHeight: CGFloat
+    var horizontalPadding: CGFloat = 10
+    var verticalPadding: CGFloat = 14
+    let content: Content
+
+    init(
+        minHeight: CGFloat,
+        horizontalPadding: CGFloat = 10,
+        verticalPadding: CGFloat = 14,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.minHeight = minHeight
+        self.horizontalPadding = horizontalPadding
+        self.verticalPadding = verticalPadding
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(.vertical, verticalPadding)
+            .padding(.horizontal, horizontalPadding)
+            .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: minHeight, alignment: .top)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.92))
+                    .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 3)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+    }
+}
+
 struct ReflectTodayMoodCard: View {
     let mood: ReflectMoodOption?
 
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Today's Mood:")
-                .font(.custom("SortsMillGoudy-Italic", size: 20))
-                .foregroundStyle(Color.black.opacity(0.85))
+        ReflectDailyMoodOverviewCard(minHeight: reflectLandingMoodCardHeight, horizontalPadding: 10) {
+            VStack(spacing: 12) {
+                Text("Today's mood:")
+                    .font(.custom("SortsMillGoudy-Italic", size: 20))
+                    .foregroundStyle(Color.black.opacity(0.85))
 
-            if let mood {
-                MoodAssetImage(
-                    assetName: mood.assetName,
-                    intensity: 0.85
-                )
-                .frame(width: 102, height: 102)
-            } else {
-                Circle()
-                    .stroke(
-                        Color.black.opacity(0.65),
-                        style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])
+                if let mood {
+                    MoodAssetImage(
+                        assetName: mood.assetName,
+                        intensity: 0.85
                     )
                     .frame(width: 102, height: 102)
-            }
+                } else {
+                    Circle()
+                        .stroke(
+                            Color.black.opacity(0.65),
+                            style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])
+                        )
+                        .frame(width: 102, height: 102)
+                }
 
-            ReflectActionButton(title: "Log Mood", fillHorizontally: true)
+                ReflectActionButton(title: "Log Mood", fillHorizontally: true)
+            }
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 10)
-        .frame(
-            maxWidth: .infinity,
-            minHeight: reflectLandingMoodCardHeight,
-            maxHeight: reflectLandingMoodCardHeight,
-            alignment: .top
-        )
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.92))
-                .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 5)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
-        )
     }
 }
 
@@ -863,60 +891,46 @@ struct ReflectStreakCard: View {
     let days: Int
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image("Streak")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 22, height: 24)
+        ReflectDailyMoodOverviewCard(minHeight: reflectLandingMoodCardHeight, horizontalPadding: 12) {
+            VStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Image("Streak")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 20, height: 20)
+                        .offset(y: -3)
 
-                Text("Streak")
-                    .font(.custom("SortsMillGoudy-Regular", size: 32))
-                    .foregroundStyle(Color.black.opacity(0.9))
-            }
+                    Text("Streak")
+                        .font(.custom("SortsMillGoudy-Regular", size: 20))
+                        .foregroundStyle(Color.black.opacity(0.9))
+                }
 
-            Text("\(days)")
-                .font(.custom("BricolageGrotesque-96ptExtraBold_Regular", size: 68))
-                .foregroundStyle(
-                    LinearGradient(
-                        stops: [
-                            .init(color: Color(red: 0.98, green: 0.53, blue: 0.42), location: 0.02),
-                            .init(color: Color(red: 0.97, green: 0.66, blue: 0.38), location: 0.48),
-                            .init(color: Color(red: 0.90, green: 0.72, blue: 0.36), location: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
+                Text("\(days)")
+                    .font(.custom("BricolageGrotesque-96ptExtraBold_Regular", size: 68))
+                    .foregroundStyle(
+                        LinearGradient(
+                            stops: [
+                                .init(color: Color(red: 0.98, green: 0.53, blue: 0.42), location: 0.02),
+                                .init(color: Color(red: 0.97, green: 0.66, blue: 0.38), location: 0.48),
+                                .init(color: Color(red: 0.90, green: 0.72, blue: 0.36), location: 1.0)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                )
 
-            Text("Days")
-                .font(.custom("Poppins-Regular", size: 16))
-                .foregroundStyle(Color.black.opacity(0.9))
+                Text("Days")
+                    .font(.custom("Poppins-Regular", size: 16))
+                    .foregroundStyle(Color.black.opacity(0.9))
 
-            if days > 0 {
-                Text("Keep it up!")
-                    .font(.custom("Poppins-Regular", size: 12))
-                    .foregroundStyle(Color.black.opacity(0.7))
-                    .padding(.top, 2)
+                if days > 0 {
+                    Text("Keep it up!")
+                        .font(.custom("Poppins-Regular", size: 12))
+                        .foregroundStyle(Color.black.opacity(0.7))
+                        .padding(.top, 2)
+                }
             }
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 12)
-        .frame(
-            maxWidth: .infinity,
-            minHeight: reflectLandingMoodCardHeight,
-            maxHeight: reflectLandingMoodCardHeight,
-            alignment: .top
-        )
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.92))
-                .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 5)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
-        )
     }
 
 }
@@ -927,26 +941,27 @@ struct ReflectYesterdayMoodSummary: View {
     var minHeight: CGFloat? = nil
 
     var body: some View {
-        VStack(spacing: 8) {
-            Text("Yesterday's mood:")
-                .font(.custom("SortsMillGoudy-Italic", size: 20))
-                .foregroundStyle(Color.black.opacity(0.9))
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .frame(maxWidth: .infinity, alignment: .center)
+        ReflectDailyMoodOverviewCard(minHeight: minHeight ?? reflectLandingMoodCardHeight, horizontalPadding: 10) {
+            VStack(spacing: 8) {
+                Text("Yesterday's mood:")
+                    .font(.custom("SortsMillGoudy-Italic", size: 20))
+                    .foregroundStyle(Color.black.opacity(0.9))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
-            MoodAssetImage(assetName: mood.assetName, intensity: 0.85)
-                .frame(width: 122, height: 122)
+                MoodAssetImage(assetName: mood.assetName, intensity: 0.85)
+                    .frame(width: 122, height: 122)
 
-            if alignMoodLabelToBottom {
-                Spacer(minLength: 0)
+                if alignMoodLabelToBottom {
+                    Spacer(minLength: 0)
+                }
+
+                Text(mood.name)
+                    .font(.custom("Poppins-Regular", size: 18))
+                    .foregroundStyle(Color.black.opacity(0.88))
             }
-
-            Text(mood.name)
-                .font(.custom("Poppins-Regular", size: 18))
-                .foregroundStyle(Color.black.opacity(0.88))
         }
-        .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: minHeight, alignment: .top)
     }
 }
 
@@ -979,7 +994,7 @@ struct ReflectHero: View {
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(Color.white.opacity(0.92))
-                .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 8)
+                .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 3)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -1002,7 +1017,7 @@ struct ReflectCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.white)
-                    .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -1025,7 +1040,7 @@ struct ReflectGradientCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.white.opacity(0.92))
-                    .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -1048,7 +1063,7 @@ struct ReflectTodayGradientCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.white.opacity(0.92))
-                    .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 5)
+                    .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 3)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -1071,7 +1086,7 @@ struct ReflectPatternsGradientCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.white.opacity(0.92))
-                    .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -1100,7 +1115,7 @@ struct ReflectSoftCard<Content: View>: View {
                             .stroke(Color.black.opacity(0.08), lineWidth: 1)
                             .blendMode(.softLight)
                     )
-                    .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 3)
             )
     }
 }
@@ -1140,7 +1155,7 @@ struct ReflectMoodCard: View {
                         Circle()
                             .fill(Color.white)
                             .frame(width: 32, height: 32)
-                            .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 4)
+                            .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 3)
                         Image(systemName: "plus")
                             .foregroundStyle(Color.black.opacity(0.7))
                     }
@@ -1204,7 +1219,7 @@ struct DailyMoodView: View {
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .fill(Color.white.opacity(0.96))
-                                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -1490,7 +1505,7 @@ struct MoodAssetImage: View {
             .aspectRatio(contentMode: contentMode)
             .saturation(0.6 + (0.4 * intensity))
             .opacity(0.4 + (0.6 * intensity))
-            .shadow(color: Color.black.opacity(0.15), radius: 6, x: 0, y: 4)
+            .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 3)
     }
 }
 
@@ -1517,15 +1532,17 @@ struct MoodSelectorPreview: View {
             MoodAssetImage(assetName: mood.assetName, intensity: isSelected ? 0.85 : 0.7)
                 .frame(width: size, height: size)
                 .scaleEffect(isSelected ? 1.08 : 1.0)
-            .overlay(alignment: .bottom) {
-                if isSelected {
-                    Capsule()
-                        .fill(Color.black.opacity(0.42))
-                        .frame(width: 24, height: 3)
-                        .offset(y: 8)
+                .overlay {
+                    if isSelected {
+                        Circle()
+                            .stroke(
+                                ReflectPalette.lightGreen,
+                                style: StrokeStyle(lineWidth: 1.4, dash: [4, 3])
+                            )
+                            .padding(-7)
+                    }
                 }
-            }
-            .animation(.easeOut(duration: 0.16), value: isSelected)
+                .animation(.easeOut(duration: 0.16), value: isSelected)
 
             if showLabel {
                 Text(mood.name)
@@ -1558,7 +1575,7 @@ struct MoodOrbitPicker: View {
                         MoodAssetImage(assetName: selectedMood.assetName, intensity: 0.85)
                             .frame(width: 130, height: 130)
                         Text(selectedMood.name)
-                            .font(.custom("SortsMillGoudy-Regular", size: 22))
+                            .font(.custom("SortsMillGoudy-Regular", size: 14))
                             .foregroundStyle(Color.black.opacity(0.8))
                     }
                     .position(x: center.x, y: center.y)
@@ -1585,11 +1602,11 @@ struct MoodOrbitPicker: View {
                     } label: {
                         MoodSelectorPreview(
                             mood: mood,
-                            size: 60,
+                            size: 54,
                             isSelected: idx == selectedMoodIndex,
                             showLabel: false
                         )
-                        .frame(width: 80, height: 80)
+                        .frame(width: 76, height: 76)
                         .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
@@ -1671,7 +1688,7 @@ struct MoodOrbitPicker: View {
 
 
 struct PatternsTrendsView: View {
-    private let inkColor = Color(red: 0.13, green: 0.13, blue: 0.13)
+    private let inkColor = ReflectPalette.brown
     private let sectionTitleSize: CGFloat = 24
     private let bodyFontSize: CGFloat = 14
     private let calendar = Calendar.current
@@ -1745,7 +1762,7 @@ struct PatternsTrendsView: View {
         VStack(alignment: .leading, spacing: 30) {
             if !isEmbeddedInLanding {
                 VStack(spacing: 10) {
-                    Text("Patterns & Trends")
+                    Text("Trends")
                         .font(.custom("SortsMillGoudy-Regular", size: 28))
                         .foregroundStyle(Color.black.opacity(0.92))
                 }
@@ -2144,7 +2161,7 @@ struct TrendsHeroPill: View {
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(Color.white.opacity(0.92))
-                .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 8)
+                .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 3)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -2178,7 +2195,7 @@ struct TrendsSurfaceCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(Color.white.opacity(0.92))
-                    .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 3)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -2201,7 +2218,7 @@ struct TrendsMoodAnalyticsCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(Color.white.opacity(0.92))
-                    .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -2232,7 +2249,7 @@ struct TrendsScatterPlot: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.white)
-                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 6)
+                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 3)
 
                 Path { path in
                     let stepX = size.width / 4
@@ -2336,9 +2353,9 @@ struct SelfJournalView: View {
     private let today = Date()
     private let calendar = Calendar.current
     private let entryHint = "Keep it short"
-    private let tabBarColor = Color(red: 0.97, green: 0.97, blue: 0.97)
-    private let inkColor = Color(red: 0.14, green: 0.14, blue: 0.14)
-    private let accentColor = Color(red: 0.16, green: 0.3, blue: 0.22)
+    private let tabBarColor = ReflectPalette.warmWhite
+    private let inkColor = ReflectPalette.brown
+    private let accentColor = ReflectPalette.primaryGreen
     private let onPromptChange: (String) -> Void
     private let onPromptResponseSave: (String) -> Void
     private let isEmbeddedInLanding: Bool
@@ -2704,7 +2721,7 @@ struct ReflectJournalSurfaceCard<Content: View>: View {
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(Color.white.opacity(0.92))
-                    .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 8)
+                    .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 3)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -2737,7 +2754,7 @@ struct ReflectJournalActionButton<Fill: ShapeStyle>: View {
                 .stroke(Color.white.opacity(0.7), lineWidth: 1)
                 .blendMode(.softLight)
         )
-        .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 6)
+        .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 3)
     }
 }
 
@@ -2788,9 +2805,9 @@ struct ReflectJournalCoverSection: View {
     @State private var handledExternalOpenToken: UUID? = nil
     @FocusState private var isTodayEditorFocused: Bool
 
-    private let tabTextColor = Color(red: 0.2, green: 0.28, blue: 0.22)
-    private let tabInactiveColor = Color(red: 0.2, green: 0.28, blue: 0.22).opacity(0.95)
-    private let pageCardBackground = Color(red: 0.98, green: 0.98, blue: 0.97)
+    private let tabTextColor = ReflectPalette.secondaryGreen
+    private let tabInactiveColor = ReflectPalette.secondaryGreen.opacity(0.95)
+    private let pageCardBackground = ReflectPalette.warmWhite
     private let coverPanelHeight: CGFloat = 520
     private let todayDraftPageCharacterLimit: Int = 470
     private var calendar: Calendar {
@@ -2888,9 +2905,9 @@ struct ReflectJournalCoverSection: View {
                                         )
                                         .shadow(
                                             color: isSelected ? Color.black.opacity(0.08) : Color.black.opacity(0.06),
-                                            radius: isSelected ? 2.8 : 2.2,
+                                            radius: 4,
                                             x: 0,
-                                            y: 0.8
+                                            y: 3
                                         )
                                 )
                         }
@@ -2921,7 +2938,7 @@ struct ReflectJournalCoverSection: View {
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .stroke(Color.black.opacity(0.08), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
                 .zIndex(1)
             }
         }
@@ -3053,7 +3070,7 @@ struct ReflectJournalCoverSection: View {
                         } label: {
                             Text("Done")
                                 .font(.custom("SortsMillGoudy-Regular", size: 20))
-                                .foregroundStyle(Color(red: 0.15, green: 0.23, blue: 0.16).opacity(0.95))
+                                .foregroundStyle(ReflectPalette.secondaryGreen.opacity(0.95))
                                 .padding(.vertical, 8)
                                 .padding(.horizontal, 34)
                                 .background(
@@ -3073,7 +3090,7 @@ struct ReflectJournalCoverSection: View {
                                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                                 .stroke(Color.white.opacity(0.68), lineWidth: 1)
                                         )
-                                        .shadow(color: Color.black.opacity(0.12), radius: 5, x: 0, y: 3)
+                                        .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 3)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -3587,7 +3604,7 @@ private struct ReflectJournalPastEntriesCalendar: View {
                                         color: hasEntry ? Color.black.opacity(0.1) : .clear,
                                         radius: 4,
                                         x: 0,
-                                        y: 2
+                                        y: 3
                                     )
 
                                 Text("\(day)")
@@ -4208,7 +4225,7 @@ struct MoodLevelBar: View {
                     )
             }
             .clipShape(Capsule())
-            .shadow(color: Color.black.opacity(0.1), radius: 1.5, x: 0, y: 1)
+            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
             .contentShape(Rectangle())
             .animation(.easeOut(duration: 0.12), value: value)
             .gesture(
@@ -4272,7 +4289,7 @@ struct MostExperiencedMoodCard: View {
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color.white.opacity(0.9))
-                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 3)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
