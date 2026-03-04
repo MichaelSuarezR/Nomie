@@ -217,6 +217,26 @@ struct ReflectView: View {
         }
     }
 
+    private var past7DayDriftHours: [CGFloat] {
+        _ = moodLevelsRefreshTick
+        let today = calendar.startOfDay(for: Date())
+        let fallbackLevels: [MoodLevelState] = [
+            .init(label: "stress", value: 0.5),
+            .init(label: "fun", value: 0.5),
+            .init(label: "laziness", value: 0.5),
+            .init(label: "inspired", value: 0.5)
+        ]
+
+        return (0..<7).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -6 + offset, to: today) else {
+                return CGFloat(3)
+            }
+            let key = ReflectDateKey(date: date, calendar: calendar)
+            let levels = ReflectMoodLevelStore.loadLevels(for: key, defaults: fallbackLevels)
+            return driftHours(from: levels)
+        }
+    }
+
     private func moodScore(from levels: [MoodLevelState]) -> CGFloat {
         let stress = levelValue(for: "stress", in: levels)
         let fun = levelValue(for: "fun", in: levels)
@@ -230,6 +250,17 @@ struct ReflectView: View {
 
     private func levelValue(for label: String, in levels: [MoodLevelState]) -> Double {
         levels.first(where: { $0.label.caseInsensitiveCompare(label) == .orderedSame })?.value ?? 0.5
+    }
+
+    private func driftHours(from levels: [MoodLevelState]) -> CGFloat {
+        let stress = CGFloat(levelValue(for: "stress", in: levels))
+        let laziness = CGFloat(levelValue(for: "laziness", in: levels))
+        let fun = CGFloat(levelValue(for: "fun", in: levels))
+        let inspired = CGFloat(levelValue(for: "inspired", in: levels))
+
+        let driftSignal = (0.46 * stress) + (0.32 * laziness) + (0.14 * (1 - fun)) + (0.08 * (1 - inspired))
+        let clamped = min(max(driftSignal, 0), 1)
+        return 0.5 + (clamped * 4.5)
     }
 
     var body: some View {
@@ -447,8 +478,11 @@ struct ReflectView: View {
         VStack(spacing: 22) {
             ReflectSectionTitle(text: "Trends", leadingAssetName: "planet2")
             VStack(spacing: 14) {
-                ReflectPatternsPreviewChart(scores: past7DayMoodScores)
-                    .frame(height: 250)
+                ReflectPatternsPreviewChart(
+                    scores: past7DayMoodScores,
+                    driftHours: past7DayDriftHours
+                )
+                .frame(height: 214)
 
                 Button {
                     selectedLandingSection = .patternsTrends
@@ -589,6 +623,9 @@ struct ReflectLandingTabChip: View {
 private struct ReflectActionButton: View {
     let title: String
     var fillHorizontally: Bool = false
+    var fontSize: CGFloat = 16
+    var verticalPadding: CGFloat = 8
+    var horizontalPadding: CGFloat = 20
 
     var body: some View {
         Group {
@@ -604,11 +641,11 @@ private struct ReflectActionButton: View {
     private var buttonLabel: some View {
         HStack(spacing: 0) {
             Text(title)
-                .font(.custom("SortsMillGoudy-Regular", size: 16))
-                .foregroundStyle(ReflectPalette.secondaryGreen.opacity(0.95))
+                .font(.custom("SortsMillGoudy-Regular", size: fontSize))
+                .foregroundStyle(ReflectPalette.primaryGreen)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 20)
+        .padding(.vertical, verticalPadding)
+        .padding(.horizontal, horizontalPadding)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(
@@ -633,15 +670,19 @@ private struct ReflectActionButton: View {
 
 private struct ReflectOutlineActionButton: View {
     let title: String
+    var fontSize: CGFloat = 16
+    var verticalPadding: CGFloat = 8
+    var horizontalPadding: CGFloat = 24
+    var textColor: Color = Color.black.opacity(0.86)
 
     var body: some View {
         HStack(spacing: 0) {
             Text(title)
-                .font(.custom("SortsMillGoudy-Regular", size: 16))
-                .foregroundStyle(Color.black.opacity(0.86))
+                .font(.custom("SortsMillGoudy-Regular", size: fontSize))
+                .foregroundStyle(textColor)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 24)
+        .padding(.vertical, verticalPadding)
+        .padding(.horizontal, horizontalPadding)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.white.opacity(0.96))
@@ -656,119 +697,208 @@ private struct ReflectOutlineActionButton: View {
 
 private struct ReflectPatternsPreviewChart: View {
     let scores: [CGFloat]
-    private let weekdayAxis = ["Su", "M", "Tu", "W", "Th", "F", "S"]
+    let driftHours: [CGFloat]
+    private let weekdayAxis = ["M", "T", "W", "T", "F", "S", "S"]
+    private let chartHeight: CGFloat = 186
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .trailing) {
-                Text("Tense")
-                Spacer()
-                Text("Calm")
-            }
-            .font(.custom("AvenirNext-Regular", size: 12))
-            .foregroundStyle(Color.black.opacity(0.78))
-            .frame(height: 170)
-            .padding(.top, 2)
+            leftAxis
 
-            VStack(spacing: 9) {
-                GeometryReader { proxy in
-                    let size = proxy.size
-                    let points = chartPoints(in: size)
-
-                    ZStack {
-                        Rectangle()
-                            .fill(Color.white)
-
-                        areaPath(from: points, in: size)
-                            .fill(
-                                LinearGradient(
-                                    stops: [
-                                        .init(color: Color(red: 0.92, green: 0.91, blue: 0.66).opacity(0.82), location: 0.0),
-                                        .init(color: Color(red: 0.97, green: 0.75, blue: 0.57).opacity(0.88), location: 0.58),
-                                        .init(color: Color(red: 0.81, green: 0.93, blue: 0.90).opacity(0.82), location: 1.0)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-
-                        areaPath(from: points, in: size)
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        Color(red: 0.96, green: 0.67, blue: 0.46).opacity(0.46),
-                                        Color.clear
-                                    ],
-                                    center: UnitPoint(x: 0.62, y: 0.52),
-                                    startRadius: 12,
-                                    endRadius: max(size.width, size.height) * 0.66
-                                )
-                            )
-
-                        Path { path in
-                            path.move(to: CGPoint(x: 0, y: 0))
-                            path.addLine(to: CGPoint(x: 0, y: size.height))
-                        }
-                        .stroke(Color.black.opacity(0.14), lineWidth: 1)
-
-                        Path { path in
-                            guard let first = points.first else { return }
-                            path.move(to: first)
-                            for point in points.dropFirst() {
-                                path.addLine(to: point)
-                            }
-                        }
-                        .stroke(Color(red: 0.93, green: 0.63, blue: 0.38).opacity(0.55), lineWidth: 1.8)
-
-                        ForEach(points.indices, id: \.self) { idx in
-                            Circle()
-                                .fill(Color(red: 0.95, green: 0.62, blue: 0.33))
-                                .frame(width: 6, height: 6)
-                                .position(points[idx])
-                        }
-                    }
-                    .clipShape(Rectangle())
-                }
-                .frame(height: 170)
-
-                GeometryReader { proxy in
-                    let labelCount = xAxisLabels.count
-                    ZStack {
-                        ForEach(xAxisLabels.indices, id: \.self) { index in
-                            Text(xAxisLabels[index])
-                                .font(.custom("AvenirNext-Regular", size: 12))
-                                .foregroundStyle(Color.black.opacity(0.75))
-                                .position(
-                                    x: chartXPosition(for: index, in: proxy.size.width, pointCount: labelCount),
-                                    y: 8
-                                )
-                        }
-                    }
-                }
-                .frame(height: 16)
+            VStack(spacing: 10) {
+                chartSurface
+                weekdayLabels
             }
             .frame(maxWidth: .infinity)
 
-            VStack(alignment: .leading) {
-                Text("Drift Hours")
-                    .font(.custom("AvenirNext-Regular", size: 10))
-                    .foregroundStyle(Color.black.opacity(0.62))
-                Text("5h")
-                Spacer()
-                Text("2.5h")
-                Spacer()
-                Text("0h")
-            }
-            .font(.custom("AvenirNext-Regular", size: 12))
-            .foregroundStyle(Color.black.opacity(0.66))
-            .frame(height: 170)
-            .padding(.top, 2)
+            rightAxis
         }
+    }
+
+    private var leftAxis: some View {
+        HStack(spacing: 6) {
+            Text("Stress Level")
+                .font(.custom("Poppins-Regular", size: 12))
+                .foregroundStyle(ReflectPalette.secondaryGreen)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true)
+                .rotationEffect(.degrees(-90))
+                .frame(width: 14)
+
+            VStack(alignment: .trailing, spacing: 0) {
+                Text("10 (Tense)")
+                Spacer(minLength: 0)
+                Text("5 (Okay)")
+                Spacer(minLength: 0)
+                Text("0 (Calm)")
+            }
+            .font(.custom("Poppins-Regular", size: 11))
+            .foregroundStyle(ReflectPalette.secondaryGreen)
+        }
+        .frame(width: 88, height: chartHeight)
+        .padding(.top, 2)
+    }
+
+    private var rightAxis: some View {
+        HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("6hr")
+                Spacer(minLength: 0)
+                Text("3hr")
+                Spacer(minLength: 0)
+                Text("0hr")
+            }
+            .font(.custom("Poppins-Regular", size: 11))
+            .foregroundStyle(ReflectPalette.secondaryGreen)
+
+            Text("Drift Hours")
+                .font(.custom("Poppins-Regular", size: 12))
+                .foregroundStyle(ReflectPalette.secondaryGreen)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: true)
+                .rotationEffect(.degrees(90))
+                .frame(width: 14)
+        }
+        .frame(width: 56, height: chartHeight)
+        .padding(.top, 2)
+    }
+
+    private var chartSurface: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let points = chartPoints(in: size)
+            let barWidth = barWidth(for: size.width, pointCount: chartValues.count)
+            let driftData = alignedDriftValues(for: chartValues.count)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(ReflectPalette.warmWhite.opacity(0.82))
+
+                ForEach(points.indices, id: \.self) { idx in
+                    let x = points[idx].x
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: ReflectPalette.lightGreen.opacity(0.60), location: 0.0),
+                                    .init(color: ReflectPalette.warmWhite.opacity(0.38), location: 0.45),
+                                    .init(color: ReflectPalette.lightBrown.opacity(0.54), location: 1.0)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(ReflectPalette.secondaryGreen.opacity(0.22), lineWidth: 1)
+                        )
+                        .frame(width: barWidth, height: size.height)
+                        .position(x: x, y: size.height / 2)
+                }
+
+                ForEach(points.indices, id: \.self) { idx in
+                    let driftValue = driftData[idx]
+                    let x = points[idx].x
+                    let topY = driftYPosition(for: driftValue, in: size.height)
+                    let height = max(size.height - topY, 6)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: ReflectPalette.lightGreen.opacity(0.78), location: 0.0),
+                                    .init(color: Color(red: 0.98, green: 0.78, blue: 0.50).opacity(0.93), location: 0.62),
+                                    .init(color: Color(red: 0.95, green: 0.63, blue: 0.38).opacity(0.98), location: 1.0)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color.white.opacity(0.40), lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+                        .frame(width: barWidth, height: height)
+                        .position(x: x, y: topY + (height / 2))
+                }
+
+                ForEach(points.indices, id: \.self) { idx in
+                    Path { path in
+                        path.move(to: CGPoint(x: points[idx].x, y: 0))
+                        path.addLine(to: CGPoint(x: points[idx].x, y: size.height))
+                    }
+                    .stroke(ReflectPalette.secondaryGreen.opacity(0.16), lineWidth: 1)
+                }
+
+                horizontalGridLine(at: yPosition(for: 5, in: size.height), in: size, opacity: 0.22)
+                horizontalGridLine(at: yPosition(for: 3, in: size.height), in: size, opacity: 0.18)
+                horizontalGridLine(at: yPosition(for: 1, in: size.height), in: size, opacity: 0.2)
+
+                if points.count > 1 {
+                    areaPath(from: points, in: size)
+                        .fill(
+                            LinearGradient(
+                                stops: [
+                                    .init(color: ReflectPalette.lightGreen.opacity(0.18), location: 0.0),
+                                    .init(color: Color(red: 0.98, green: 0.77, blue: 0.47).opacity(0.22), location: 0.58),
+                                    .init(color: Color(red: 0.96, green: 0.64, blue: 0.42).opacity(0.30), location: 1.0)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    smoothedLinePath(from: points)
+                        .stroke(Color(red: 0.96, green: 0.63, blue: 0.36).opacity(0.84), lineWidth: 2)
+
+                    ForEach(points.indices, id: \.self) { idx in
+                        Circle()
+                            .fill(Color(red: 0.98, green: 0.66, blue: 0.30))
+                            .frame(width: 7, height: 7)
+                            .position(points[idx])
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .frame(height: chartHeight)
+    }
+
+    private var weekdayLabels: some View {
+        GeometryReader { proxy in
+            let labels = xAxisLabels
+            ZStack {
+                ForEach(labels.indices, id: \.self) { index in
+                    Text(labels[index])
+                        .font(.custom("Poppins-Regular", size: 10))
+                        .foregroundStyle(ReflectPalette.secondaryGreen)
+                        .position(
+                            x: chartXPosition(for: index, in: proxy.size.width, pointCount: labels.count),
+                            y: 9
+                        )
+                }
+            }
+        }
+        .frame(height: 18)
     }
 
     private var chartValues: [CGFloat] {
         let cleaned = scores.map { min(max($0, 1), 5) }
         return cleaned.isEmpty ? [3, 3, 3, 3, 3, 3, 3] : cleaned
+    }
+
+    private func alignedDriftValues(for count: Int) -> [CGFloat] {
+        let cleaned = driftHours.map { min(max($0, 0), 6) }
+        if cleaned.count == count {
+            return cleaned
+        }
+        if cleaned.isEmpty {
+            return Array(repeating: 3.0, count: count)
+        }
+        if cleaned.count > count {
+            return Array(cleaned.suffix(count))
+        }
+        return Array(repeating: cleaned.first ?? 3.0, count: count - cleaned.count) + cleaned
     }
 
     private var xAxisLabels: [String] {
@@ -794,10 +924,24 @@ private struct ReflectPatternsPreviewChart: View {
 
     private func chartXPosition(for index: Int, in width: CGFloat, pointCount: Int) -> CGFloat {
         guard pointCount > 1 else { return width / 2 }
-        let inset: CGFloat = 0
+        let inset: CGFloat = 14
         let usableWidth = max(width - (inset * 2), 0)
         let step = usableWidth / CGFloat(pointCount - 1)
         return inset + (step * CGFloat(index))
+    }
+
+    private func barWidth(for width: CGFloat, pointCount: Int) -> CGFloat {
+        let inset: CGFloat = 14
+        let usableWidth = max(width - (inset * 2), 0)
+        guard pointCount > 1 else { return usableWidth * 0.7 }
+        let slot = usableWidth / CGFloat(pointCount)
+        return min(52, max(24, slot * 0.78))
+    }
+
+    private func driftYPosition(for value: CGFloat, in height: CGFloat) -> CGFloat {
+        let clamped = min(max(value, 0), 6)
+        let normalized = clamped / 6
+        return height * (1 - normalized)
     }
 
     private func yPosition(for value: CGFloat, in height: CGFloat) -> CGFloat {
@@ -806,15 +950,65 @@ private struct ReflectPatternsPreviewChart: View {
         return height * (1 - normalized)
     }
 
+    private func horizontalGridLine(at y: CGFloat, in size: CGSize, opacity: Double) -> some View {
+        Path { path in
+            path.move(to: CGPoint(x: 0, y: y))
+            path.addLine(to: CGPoint(x: size.width, y: y))
+        }
+        .stroke(ReflectPalette.secondaryGreen.opacity(opacity), lineWidth: 1)
+    }
+
+    private func smoothedLinePath(from points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        guard points.count > 1 else { return path }
+
+        for idx in 0..<(points.count - 1) {
+            let p0 = idx > 0 ? points[idx - 1] : points[idx]
+            let p1 = points[idx]
+            let p2 = points[idx + 1]
+            let p3 = idx + 2 < points.count ? points[idx + 2] : p2
+
+            let control1 = CGPoint(
+                x: p1.x + ((p2.x - p0.x) / 6),
+                y: p1.y + ((p2.y - p0.y) / 6)
+            )
+            let control2 = CGPoint(
+                x: p2.x - ((p3.x - p1.x) / 6),
+                y: p2.y - ((p3.y - p1.y) / 6)
+            )
+
+            path.addCurve(to: p2, control1: control1, control2: control2)
+        }
+
+        return path
+    }
+
     private func areaPath(from points: [CGPoint], in size: CGSize) -> Path {
         var path = Path()
         guard let first = points.first, let last = points.last else { return path }
-
         path.move(to: CGPoint(x: first.x, y: size.height))
         path.addLine(to: first)
-        for point in points.dropFirst() {
-            path.addLine(to: point)
+
+        for idx in 0..<(points.count - 1) {
+            let p0 = idx > 0 ? points[idx - 1] : points[idx]
+            let p1 = points[idx]
+            let p2 = points[idx + 1]
+            let p3 = idx + 2 < points.count ? points[idx + 2] : p2
+
+            let control1 = CGPoint(
+                x: p1.x + ((p2.x - p0.x) / 6),
+                y: p1.y + ((p2.y - p0.y) / 6)
+            )
+            let control2 = CGPoint(
+                x: p2.x - ((p3.x - p1.x) / 6),
+                y: p2.y - ((p3.y - p1.y) / 6)
+            )
+
+            path.addCurve(to: p2, control1: control1, control2: control2)
         }
+
         path.addLine(to: CGPoint(x: last.x, y: size.height))
         path.closeSubpath()
         return path
@@ -906,7 +1100,7 @@ struct ReflectStreakCard: View {
                 }
 
                 Text("\(days)")
-                    .font(.custom("BricolageGrotesque-96ptExtraBold_Regular", size: 68))
+                    .font(.custom("Poppins-SemiBold", size: 68))
                     .foregroundStyle(
                         LinearGradient(
                             stops: [
@@ -1321,7 +1515,10 @@ struct DailyMoodView: View {
                                         .frame(width: 34, height: 34)
                                 }
                                 Text(day.dayLabel)
-                                    .font(.custom("Poppins-Regular", size: 10))
+                                    .font(.custom("Poppins-SemiBold", size: 11))
+                                    .foregroundStyle(ReflectPalette.primaryGreen.opacity(0.98))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.9)
                                 Text(day.dateLabel)
                                     .font(.custom("Poppins-Regular", size: 10))
                                     .foregroundStyle(Color.black.opacity(0.6))
@@ -1470,18 +1667,19 @@ struct DailyMoodView: View {
 
     private func last7Days() -> [ReflectMoodDayDisplay] {
         let today = calendar.startOfDay(for: Date())
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M.d"
-        let weekdayLabels = ["SU", "M", "TU", "W", "TH", "F", "S"]
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "M.d"
+        let weekdayFormatter = DateFormatter()
+        weekdayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        weekdayFormatter.dateFormat = "EEE"
 
         return (0..<7).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -6 + offset, to: today) else { return nil }
-            let weekdayIndex = calendar.component(.weekday, from: date) - 1
             let key = ReflectDateKey(date: date, calendar: calendar)
             let mood = loggedMoods[key]
             return ReflectMoodDayDisplay(
-                dayLabel: weekdayLabels[weekdayIndex],
-                dateLabel: formatter.string(from: date),
+                dayLabel: weekdayFormatter.string(from: date).uppercased(),
+                dateLabel: dateFormatter.string(from: date),
                 mood: mood
             )
         }
@@ -1782,8 +1980,11 @@ struct PatternsTrendsView: View {
                             .foregroundStyle(inkColor.opacity(0.92))
                     }
 
-                    ReflectPatternsPreviewChart(scores: trendGraphScores)
-                        .frame(height: 250)
+                    ReflectPatternsPreviewChart(
+                        scores: trendGraphScores,
+                        driftHours: past7DayDriftHours
+                    )
+                    .frame(height: 214)
                 }
             }
 
@@ -1805,8 +2006,7 @@ struct PatternsTrendsView: View {
                                 Text("•")
                                     .font(.custom("AvenirNext-Regular", size: bodyFontSize))
                                     .foregroundStyle(inkColor.opacity(0.85))
-                                Text(analyticsInsightLines[index])
-                                    .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+                                analyticsInsightText(analyticsInsightLines[index])
                                     .foregroundStyle(inkColor.opacity(0.86))
                             }
                         }
@@ -1936,6 +2136,40 @@ struct PatternsTrendsView: View {
         }
 
         return Array(lines.prefix(2))
+    }
+
+    private func analyticsInsightText(_ line: String) -> Text {
+        let pattern = #"(?i)\b(?:anxious|happier|happy|tense|calm|calmer)\b|\d+(?:\.\d+)?%"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return Text(line).font(.custom("AvenirNext-Regular", size: bodyFontSize))
+        }
+
+        let nsRange = NSRange(line.startIndex..., in: line)
+        let matches = regex.matches(in: line, options: [], range: nsRange)
+        guard !matches.isEmpty else {
+            return Text(line).font(.custom("AvenirNext-Regular", size: bodyFontSize))
+        }
+
+        var cursor = line.startIndex
+        var output = Text("")
+
+        for match in matches {
+            guard let range = Range(match.range, in: line) else { continue }
+            if cursor < range.lowerBound {
+                output = output + Text(String(line[cursor..<range.lowerBound]))
+                    .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+            }
+            output = output + Text(String(line[range]))
+                .font(.custom("AvenirNext-DemiBold", size: bodyFontSize))
+            cursor = range.upperBound
+        }
+
+        if cursor < line.endIndex {
+            output = output + Text(String(line[cursor...]))
+                .font(.custom("AvenirNext-Regular", size: bodyFontSize))
+        }
+
+        return output
     }
 
     private var emptyAnalyticsText: String {
@@ -2537,49 +2771,43 @@ struct SelfJournalView: View {
                         Spacer()
                     }
 
-                    HStack(spacing: 8) {
-                        Button {
-                            promptResponse = ""
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "xmark")
-                                Text("Clear")
-                            }
-                            .font(.custom("AvenirNext-Medium", size: 11))
-                            .foregroundStyle(inkColor.opacity(0.72))
-                            .padding(.vertical, 7)
-                            .padding(.horizontal, 12)
-                            .background(
-                                Capsule()
-                                    .fill(Color.black.opacity(0.06))
-                            )
-                        }
-                        .buttonStyle(.plain)
-
+                    HStack(spacing: 10) {
                         Spacer()
 
                         Button {
+                            promptResponse = ""
+                            isEntryFocused = false
+                        } label: {
+                            ReflectOutlineActionButton(
+                                title: "Clear",
+                                fontSize: 14,
+                                verticalPadding: 6,
+                                horizontalPadding: 18,
+                                textColor: ReflectPalette.secondaryGreen.opacity(0.95)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(promptResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .opacity(promptResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+
+                        Button {
+                            guard canSavePromptResponse else { return }
                             let trimmed = promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
-                            guard !trimmed.isEmpty else { return }
                             upsertEntryForToday(promptResponse: trimmed)
                             onPromptResponseSave(trimmed)
                             promptResponse = ""
                             isEntryFocused = false
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "checkmark")
-                                Text("Done")
-                            }
-                            .font(.custom("AvenirNext-Medium", size: 11))
-                            .foregroundStyle(inkColor.opacity(0.88))
-                            .padding(.vertical, 7)
-                            .padding(.horizontal, 14)
-                            .background(
-                                Capsule()
-                                    .fill(accentColor.opacity(0.2))
+                            ReflectActionButton(
+                                title: "Done",
+                                fontSize: 14,
+                                verticalPadding: 6,
+                                horizontalPadding: 18
                             )
                         }
                         .buttonStyle(.plain)
+                        .disabled(!canSavePromptResponse)
+                        .opacity(canSavePromptResponse ? 1 : 0.45)
                     }
                 }
             }
@@ -2654,6 +2882,10 @@ struct SelfJournalView: View {
         }
 
         return ReflectJournalPrompt.displayPrompt(prompt)
+    }
+
+    private var canSavePromptResponse: Bool {
+        !promptResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func upsertPromptForToday() {
@@ -2805,27 +3037,14 @@ struct ReflectJournalCoverSection: View {
     @State private var handledExternalOpenToken: UUID? = nil
     @FocusState private var isTodayEditorFocused: Bool
 
-    private let tabTextColor = ReflectPalette.secondaryGreen
-    private let tabInactiveColor = ReflectPalette.secondaryGreen.opacity(0.95)
     private let pageCardBackground = ReflectPalette.warmWhite
     private let coverPanelHeight: CGFloat = 520
     private let todayDraftPageCharacterLimit: Int = 470
+    private let todayPageBodyHeight: CGFloat = 228
     private var calendar: Calendar {
         var cal = Calendar(identifier: .iso8601)
         cal.timeZone = .current
         return cal
-    }
-
-    private var journalTabGradient: LinearGradient {
-        LinearGradient(
-            stops: [
-                .init(color: Color(red: 0.97, green: 0.91, blue: 0.74), location: 0.0),
-                .init(color: Color(red: 0.97, green: 0.86, blue: 0.65), location: 0.62),
-                .init(color: Color(red: 0.96, green: 0.82, blue: 0.60), location: 1.0)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 
     private var externalOpenTokenValue: UUID? {
@@ -2843,8 +3062,16 @@ struct ReflectJournalCoverSection: View {
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.22)) {
-                        if isOpen { finishTodayEditing() }
-                        isOpen.toggle()
+                        if isOpen {
+                            finishTodayEditing()
+                            selectedTab = .today
+                            todayPageIndex = 0
+                            isOpen = false
+                        } else {
+                            selectedTab = .today
+                            todayPageIndex = 0
+                            isOpen = true
+                        }
                     }
                 } label: {
                     HStack(spacing: 6) {
@@ -2865,9 +3092,8 @@ struct ReflectJournalCoverSection: View {
             }
 
             VStack(spacing: 0) {
-                HStack(spacing: 6) {
+                HStack(spacing: 20) {
                     ForEach(ReflectJournalCoverTab.allCases) { tab in
-                        let isSelected = selectedTab == tab
                         Button {
                             withAnimation(.easeInOut(duration: 0.22)) {
                                 if selectedTab == .today && tab != .today {
@@ -2883,39 +3109,16 @@ struct ReflectJournalCoverSection: View {
                                 }
                             }
                         } label: {
-                            Text(tab.rawValue)
-                                .font(.custom("Poppins-Regular", size: 11))
-                                .foregroundStyle(isSelected ? tabTextColor : tabInactiveColor)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.64)
-                                .allowsTightening(true)
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, 10)
-                                .frame(minHeight: 39)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(
-                                            isSelected
-                                            ? AnyShapeStyle(Color.white.opacity(0.98))
-                                            : AnyShapeStyle(journalTabGradient)
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(Color.white.opacity(0.8), lineWidth: 1)
-                                        )
-                                        .shadow(
-                                            color: isSelected ? Color.black.opacity(0.08) : Color.black.opacity(0.06),
-                                            radius: 4,
-                                            x: 0,
-                                            y: 3
-                                        )
-                                )
+                            ReflectLandingTabChip(
+                                title: tab.rawValue,
+                                isSelected: isOpen && selectedTab == tab
+                            )
                         }
                         .buttonStyle(.plain)
-                        .frame(maxWidth: .infinity)
                     }
                 }
-                .padding(.horizontal, 0)
+                .padding(.horizontal, 2)
+                .padding(.top, 2)
                 .padding(.bottom, -10)
                 .zIndex(0)
 
@@ -2927,6 +3130,8 @@ struct ReflectJournalCoverSection: View {
                             .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                             .onTapGesture {
                                 withAnimation(.easeInOut(duration: 0.22)) {
+                                    selectedTab = .today
+                                    todayPageIndex = 0
                                     isOpen = true
                                 }
                             }
@@ -3014,6 +3219,8 @@ struct ReflectJournalCoverSection: View {
                         }
                     }
 
+                    todayPromptCard
+
                     if isWritingToday {
                         TextEditor(text: todayDraftPageTextBinding)
                             .font(.custom("AvenirNext-Regular", size: 14))
@@ -3021,7 +3228,7 @@ struct ReflectJournalCoverSection: View {
                             .scrollContentBackground(.hidden)
                             .scrollIndicators(.hidden)
                             .scrollDisabled(true)
-                            .frame(maxWidth: .infinity, minHeight: 330, maxHeight: 330, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, minHeight: todayPageBodyHeight, maxHeight: todayPageBodyHeight, alignment: .topLeading)
                             .padding(.horizontal, 10)
                             .padding(.top, 10)
                             .background(
@@ -3034,7 +3241,7 @@ struct ReflectJournalCoverSection: View {
                             )
                             .focused($isTodayEditorFocused)
 
-                        HStack(alignment: .bottom) {
+                        HStack(alignment: .center, spacing: 8) {
                             Button {
                                 guard todayDraftPageIndex > 0 else { return }
                                 triggerArrowHaptic()
@@ -3048,7 +3255,21 @@ struct ReflectJournalCoverSection: View {
                             .buttonStyle(.plain)
                             .disabled(todayDraftPageIndex == 0)
 
-                            Spacer()
+                            Spacer(minLength: 10)
+
+                            Button {
+                                finishTodayEditing()
+                            } label: {
+                                ReflectActionButton(
+                                    title: "Done",
+                                    fontSize: 14,
+                                    verticalPadding: 6,
+                                    horizontalPadding: 18
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            Spacer(minLength: 10)
 
                             Button {
                                 guard todayDraftPageIndex < todayDraftPages.count - 1 else { return }
@@ -3064,43 +3285,12 @@ struct ReflectJournalCoverSection: View {
                             .disabled(todayDraftPageIndex >= todayDraftPages.count - 1)
                         }
                         .padding(.horizontal, 2)
-
-                        Button {
-                            finishTodayEditing()
-                        } label: {
-                            Text("Done")
-                                .font(.custom("SortsMillGoudy-Regular", size: 20))
-                                .foregroundStyle(ReflectPalette.secondaryGreen.opacity(0.95))
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 34)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                stops: [
-                                                    .init(color: Color(red: 0.98, green: 0.89, blue: 0.73), location: 0.0),
-                                                    .init(color: Color(red: 0.93, green: 0.91, blue: 0.69), location: 0.55),
-                                                    .init(color: Color(red: 0.88, green: 0.91, blue: 0.70), location: 1.0)
-                                                ],
-                                                startPoint: .bottomLeading,
-                                                endPoint: .topTrailing
-                                            )
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                                .stroke(Color.white.opacity(0.68), lineWidth: 1)
-                                        )
-                                        .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 3)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .frame(maxWidth: .infinity, alignment: .center)
                     } else {
                         Text(todayCurrentPageText)
                             .font(.custom("AvenirNext-Regular", size: 13))
                             .foregroundStyle(Color.black.opacity(0.82))
                             .lineSpacing(3)
-                            .frame(maxWidth: .infinity, minHeight: 330, maxHeight: 330, alignment: .topLeading)
+                            .frame(maxWidth: .infinity, minHeight: todayPageBodyHeight, maxHeight: todayPageBodyHeight, alignment: .topLeading)
                             .padding(14)
                             .background(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -3221,6 +3411,42 @@ struct ReflectJournalCoverSection: View {
 
     private var todayDisplayDateLabel: String {
         todayFullDateFormatter.string(from: Date())
+    }
+
+    private var todayPromptHeading: String {
+        "\(weekdayFormatter.string(from: Date()))'s Prompt:"
+    }
+
+    private var todayPromptText: String {
+        guard let entry = entryForDate(Date()) else { return "No prompt yet." }
+        let response = entry.promptResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+        return ReflectJournalPrompt.filledPromptString(entry.prompt, with: response)
+    }
+
+    private var todayPromptCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(todayPromptHeading)
+                .font(.custom("SortsMillGoudy-Italic", size: 16))
+                .foregroundStyle(ReflectPalette.brown.opacity(0.88))
+
+            Text(todayPromptText)
+                .font(.custom("SortsMillGoudy-Regular", size: 14))
+                .foregroundStyle(ReflectPalette.brown.opacity(0.92))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.9))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(ReflectPalette.lightGreen, lineWidth: 1)
+                )
+        )
     }
 
     private var todayFullDateFormatter: DateFormatter {
@@ -4321,18 +4547,19 @@ extension ReflectView {
     private func last7Days() -> [ReflectMoodDayDisplay] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M.d"
-        let weekdayLabels = ["SU", "M", "TU", "W", "TH", "F", "S"]
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "M.d"
+        let weekdayFormatter = DateFormatter()
+        weekdayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        weekdayFormatter.dateFormat = "EEE"
 
         return (0..<7).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -6 + offset, to: today) else { return nil }
-            let weekdayIndex = calendar.component(.weekday, from: date) - 1
             let key = ReflectDateKey(date: date, calendar: calendar)
             let mood = loggedMoods[key]
             return ReflectMoodDayDisplay(
-                dayLabel: weekdayLabels[weekdayIndex],
-                dateLabel: formatter.string(from: date),
+                dayLabel: weekdayFormatter.string(from: date).uppercased(),
+                dateLabel: dateFormatter.string(from: date),
                 mood: mood
             )
         }
