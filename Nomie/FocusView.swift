@@ -7,21 +7,22 @@ import SwiftUI
 import Foundation
 import Combine
 struct FocusView: View {
+    @State private var path = NavigationPath()
+    @State private var weeklyUsage: [[CategoryUsage]]
+    @State private var usage: [CategoryUsage]
 
-    @State private var usage: [CategoryUsage] = [
-        .init(id: .connection, usage: 4 * 3600 + 32 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
-        .init(id: .creativity, usage: 3 * 3600 + 45 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
-        .init(id: .drifting, usage: 2 * 3600 + 58 * 60, maxUsage: 5 * 3600, type: GoalType.Limit),
-        .init(id: .entertainment, usage: 1 * 3600 + 40 * 60, maxUsage: 5 * 3600, type: GoalType.Limit),
-        .init(id: .learning, usage: 52 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize),
-        .init(id: .productivity, usage: 46 * 60, maxUsage: 5 * 3600, type: GoalType.Prioritize)
-    ]
+    init() {
+        let weekly = (0..<7).map { _ in generateDayUsage() }
+        _weeklyUsage = State(initialValue: weekly)
+        _usage = State(initialValue: weekly[getDayOfWeekNum()])
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack {
                     FocusHeader(name: "Nomie")
-                    DashboardWrapper(streakDays: 8, category: "Creativity", timeOfDay: getTimeOfDayText(), usage: $usage)
+                    DashboardWrapper(streakDays: 8, category: "Creativity", timeOfDay: getTimeOfDayText(), usage: $usage, weeklyUsage: weeklyUsage)
                 }
                 .nomieTabBarContentPadding()
             }
@@ -31,6 +32,12 @@ struct FocusView: View {
             )
         }
         .navigationTitle("Focus")
+        .navigationDestination(for: Route.self) { route in
+            switch route {
+            case .intentionsEndingPage:
+                IntentionsEndingPage()
+            }
+        }
 
     }
 }
@@ -40,11 +47,13 @@ struct DashboardWrapper: View {
     let category: String
     let timeOfDay: String
     @Binding var usage: [CategoryUsage]
+    let weeklyUsage: [[CategoryUsage]]
+
     var body: some View {
         VStack(spacing: 24) {
             StreaksBar(streakDays: 8)
             WeeklyIntentions(usage: $usage)
-            Charts(usage: usage)
+            Charts(usage: usage, weeklyUsage: weeklyUsage)
             DailyInsights(category: "Creativity", timeOfDay: timeOfDay)
             //GoalsView(usage: $usage)
         }.padding(.horizontal, 21)
@@ -145,7 +154,48 @@ struct EditButton: View {
         }
     }
 }
-
+struct IntentionsEndingPage: View {
+    var body: some View {
+        VStack {
+            Text("Your canvas is set.").font(
+                Font.custom("SortsMillGoudy-Regular", size: 48)
+                .italic()
+                )
+                .multilineTextAlignment(.center)
+                .foregroundColor(getTextColor())
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            Text("Remember, these are just intentions, not rules.\nHave a great week!")
+              .font(Font.custom("Poppins", size: 14))
+              .foregroundColor(getTextColor())
+              .frame(maxWidth: .infinity, alignment: .topLeading)
+            BackToDashboardButton().frame(maxWidth:.infinity, alignment:.trailing).padding(.top, 114).padding(.trailing, 16)
+        }
+        .frame(maxHeight:.infinity, alignment:.top)
+        .padding(.top, 232).padding(.leading, 16).ignoresSafeArea(edges: .top)
+        .background(
+            Image("Intentions").resizable().aspectRatio(contentMode: .fill).ignoresSafeArea()
+        )
+    }
+}
+struct BackToDashboardButton: View {
+    var body: some View {
+        NavigationLink {
+        } label: {
+            Text("Back to dashboard").font(.custom("SortsMillGoudy-Regular", size: 16)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment:.center).padding(.horizontal, 32)
+                .padding(.top, 4).foregroundColor(.black)
+        }.frame(width: 194, height: 34).padding(.horizontal, 32)
+            .padding(.top, 4)
+            .padding(.bottom, 6)
+            .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
+            .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
+            .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
+            .overlay(
+            RoundedRectangle(cornerRadius: 4)
+            .inset(by: 0.5)
+            .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
+            )
+    }
+}
 struct IntentionsLandingPage: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
@@ -161,9 +211,9 @@ struct IntentionsLandingPage: View {
               .font(Font.custom("Poppins", size: 14))
               .foregroundColor(getTextColor())
               .frame(maxWidth: .infinity, alignment: .topLeading)
-            LetsStartButton().frame(maxWidth:.infinity, alignment:.trailing).padding(.top, 114).padding(.trailing, 16)
+            LetsStartButton(usage: $usage).frame(maxWidth:.infinity, alignment:.trailing).padding(.top, 114).padding(.trailing, 16)
         }
-        .frame(maxHeight:.infinity, alignment:.top)
+        .frame(maxHeight:.infinity, alignment: .top)
         .padding(.top, 232).padding(.leading, 16).ignoresSafeArea(edges: .top)
         .background(
             Image("Intentions").resizable().aspectRatio(contentMode: .fill).ignoresSafeArea()
@@ -171,9 +221,10 @@ struct IntentionsLandingPage: View {
     }
 }
 struct LetsStartButton: View {
+    @Binding var usage: [CategoryUsage]
     var body: some View {
         NavigationLink {
-            
+            IntentionsEditPage(usage: $usage, currentPage: 0)
         } label: {
             Text("Let’s Start")
               .font(Font.custom("SortsMillGoudy-Regular", size: 16))
@@ -191,14 +242,105 @@ struct LetsStartButton: View {
             )
     }
 }
-
-struct IntentionsEditPage: View {
+/*
+struct IntentionsView: View {
+    @Binding var usage: [CategoryUsage]
     var body: some View {
+        ForEach(usage.indices, id: \.self) {index in
+            IntentionsEditPage(usage: $usage, currentPage: index)
+        }
+    }
+}
+*/
+struct IntentionsEditPage: View {
+    @Binding var usage: [CategoryUsage]
+    var currentPage: Int
+    var body: some View {
+        VStack {
+            ProgressBar(usage: $usage, pageNum: usage.count, currentPage: currentPage).padding(.trailing, 16).padding(.top, 74)
+            Text(getIntentionsEditText(id: usage[currentPage].id)).font(Font.custom("SortsMillGoudy-Regular", size: 20))
+                .foregroundColor(getTextColor()).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 170)
+            Spacer()
+            NextButton(usage: $usage, currentPage: currentPage)
+        }.frame(maxWidth: .infinity, maxHeight:.infinity, alignment: .top).padding(.leading, 16).ignoresSafeArea(edges: .top).background(Image("Intentions-Edit-Background").resizable().aspectRatio(contentMode: .fill).ignoresSafeArea()).navigationBarBackButtonHidden(true)
+    }
+}
+struct IntentionsEditBlock: View {
+    @Binding var value: Double
+    var thumbWidth: CGFloat = 320
+    var height: CGFloat = 36
+    var horizontalPadding: CGFloat = 10
+    var body: some View {
+        GeometryReader { geo in
+            let trackWidth = geo.size.width
+            let usableWidth = trackWidth - 2 * horizontalPadding
+            let clamped = min(max(value, 0), 1)
+            let thumbX = horizontalPadding + clamped * (usableWidth - thumbWidth)
+            
+            ZStack(alignment: .leading) {
+                Capsule().fill(FocusColors.barChartFill)
+            }
+            
+        }
+    }
+}
+struct IntentionsSliderBar: View {
+    var body: some View {
+    }
+}
+struct NextButton: View {
+    @Binding var usage: [CategoryUsage]
+    var currentPage: Int
+    var body: some View {
+        NavigationLink {
+            if currentPage >= 5 {
+                IntentionsEndingPage()
+            } else {
+                IntentionsEditPage(usage: $usage, currentPage: currentPage + 1)
+            }
+        } label: {
+            Text("Next").font(.custom("SortsMillGoudy-Regular", size: 16)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment:.center).padding(.horizontal, 32)
+                .padding(.top, 4).foregroundColor(.black)
+        }.frame(width: 98, height: 34).padding(.horizontal, 32)
+            .padding(.top, 4)
+            .padding(.bottom, 6)
+            .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
+            .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
+            .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
+            .overlay(
+            RoundedRectangle(cornerRadius: 4)
+            .inset(by: 0.5)
+            .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
+            )
+    }
+}
+struct ProgressBar: View {
+    @Binding var usage: [CategoryUsage]
+    var pageNum: Int
+    var currentPage: Int
+    var body: some View {
+        HStack(spacing: 10) {
+            ForEach(0..<pageNum, id:\.self) { index in
+                RoundedRectangle(cornerRadius: 12).fill(
+                    index == currentPage ?
+                    AnyShapeStyle(FocusColors.progressFill) : AnyShapeStyle(Color.white)
+                ).frame(height: 5).overlay {
+                    if index == currentPage {
+                        RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.7, green: 0.56, blue: 0.56),lineWidth: 1)
+                    
+
+                    }
+                }
+                
+            }
+            Text("\(currentPage + 1) of \(pageNum)").font(.custom("Poppins", size: 10))
+                .multilineTextAlignment(.center)
+                .foregroundColor(getTextColor())
+        }
         
         
     }
 }
-
 struct DailyInsights: View {
     let category: String
     let timeOfDay: String
@@ -230,20 +372,187 @@ struct DailyInsights: View {
 
     }
 }
+struct DailyWeeklyToggle: View {
+    var width: CGFloat = 219
+    var height: CGFloat = 30
+    @Binding var choice: Option
+    private var cornerRadius: CGFloat { height / 2 }
+
+    var body: some View {
+        let innerWidth = width - 6
+        ZStack(alignment: .leading) {
+            // Gradient pill background
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(FocusColors.setIntentionsFill)
+
+            // Sliding white selection
+            RoundedRectangle(cornerRadius: cornerRadius - 3, style: .continuous)
+                .fill(Color.white)
+                .frame(width: innerWidth / 2, height: height - 6)
+                .offset(x: choice == .daily ? 3 : 3 + innerWidth / 2)
+                .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 1, x: 0, y: 0)
+                .animation(.spring(response: 0.28, dampingFraction: 0.85), value: choice)
+
+            // Segments
+            HStack(spacing: 0) {
+                segmentButton(.daily)
+                    .frame(width: width / 2, height: height)
+                segmentButton(.weekly)
+                    .frame(width: width / 2, height: height)
+            }
+        }
+        .frame(width: width, height: height)
+    }
+
+    private func segmentButton(_ option: Option) -> some View {
+        Button {
+            choice = option
+        } label: {
+            Text(option.title)
+                .font(.custom("Poppins", size: 14))
+                .foregroundStyle(choice == option ? getTextColor() : getTextColor().opacity(0.85))
+        }
+        .buttonStyle(.plain)
+    }
+}
 struct Charts: View {
     let usage: [CategoryUsage]
+    @State private var choice: Option = .daily
+    @State private var selectedCategory: CategoryID = .drifting
+    let weeklyUsage: [[CategoryUsage]]
     var totalSeconds: Int {
-        usage.reduce(0) { $0 + $1.usage }
+        if choice == .daily {
+            return usage.reduce(0) { $0 + $1.usage }
+        } else {
+            return weeklyUsage.reduce(0) {total, day in
+                total + day.reduce(0) { $0 + $1.usage }
+            }
+        }
     }
     var body: some View {
         VStack(spacing: 20) {
-            DashboardRadarChart().frame(height:280)
-            BarChartView(usage: usage).padding(.horizontal,12)
+            DailyWeeklyToggle(choice: $choice).padding(.top, 27)
+            if(choice == .daily) {
+                DashboardRadarChart().frame(height:320)
+                DailyBarChartView(usage: usage).padding(.horizontal,12)
+            } else {
+                WeeklyChartView(weeklyUsage: weeklyUsage, selectedCategory: $selectedCategory)
+            }
             TotalUsage(totalSeconds: totalSeconds).padding(.bottom, 16)
 
             
         }.background(RoundedRectangle(cornerRadius: 8).fill(Color.white)).shadow(color: Color(red: 0.58, green: 0.63, blue: 0.34).opacity(0.25), radius: 2, x: 0, y: 3)
         
+    }
+}
+struct CategorySelectionBars: View {
+    @Binding var selectedCategory: CategoryID
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                ForEach(CategoryID.allCases) { id in
+                    HStack(alignment: .center, spacing: 10) {
+                        Button {
+                            selectedCategory = id
+                        } label: {
+                            Text("\(id)").font(.custom("Poppins", size: 12)).multilineTextAlignment(.center).foregroundStyle(getTextColor())
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(FocusColors.barChartFill)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12).strokeBorder(Color(red: 0.7, green: 0.56, blue: 0.56), lineWidth: id == selectedCategory ? 1.5 : 0)
+                            )
+                    )
+                    .opacity(id == selectedCategory ? 1 : 0.4)
+                }
+            }.padding(.leading, 16)
+        }
+    }
+}
+struct WeeklyChartView: View {
+    let weeklyUsage: [[CategoryUsage]]
+    @Binding var selectedCategory: CategoryID
+    var body: some View {
+        VStack {
+            Text("Weekly Overview (\(selectedCategory.title))").font(.custom("SortsMillGoudy-Regular", size: 18)).foregroundStyle(getTextColor())
+            Text("\(getWeekText())").font(.custom("SortsMillGoudy-Regular", size: 12)).foregroundStyle(getTextColor())
+            CategorySelectionBars(selectedCategory: $selectedCategory).padding(.top, 4)
+            WeeklyHistogram(weeklyUsage: weeklyUsage, selectedCategory: $selectedCategory).padding(.horizontal, 28).padding(.top,24)
+            WeeklyBarChart(weeklyUsage: weeklyUsage, selectedCategory: selectedCategory).padding(.horizontal,12)
+        }
+    }
+}
+struct WeeklyHistogram: View {
+    let weeklyUsage: [[CategoryUsage]]
+    @Binding var selectedCategory: CategoryID
+    let days = ["S", "M", "T", "W", "R", "F", "S"]
+
+    var body: some View {
+        VStack {
+            HStack(alignment: .top, spacing: 14) {
+                let maxUsage = getMaxMult2(weeklyUsage: weeklyUsage, category: selectedCategory)
+                let steps = maxUsage / 7200
+                VStack {
+                    ForEach((0...steps).reversed(), id: \.self) { i in
+                        let valueHours = i * 2
+                        Text("\(valueHours) hr").font(.custom("Poppins", size: 11)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment: .trailing)
+                        if i != 0 {Spacer()}
+                    }
+                }.frame(height: 160, alignment:.top)
+                ForEach(weeklyUsage.indices, id: \.self) { index in
+                    let dailyUsageArray = weeklyUsage[index]
+                    VStack {
+                        HistogramBar(dailyUsage: getTotalDailyUsage(usage: dailyUsageArray, category: selectedCategory), maxUsage: maxUsage, height: 160).frame(maxWidth: .infinity)
+                        Text("\(days[index])")
+                            .font(.custom("Poppins", size: 12))
+                            .frame(maxWidth: .infinity)
+                    }.frame(maxWidth: .infinity)
+                }
+            }
+
+        }
+    }
+}
+struct WeeklyBarChart: View {
+    let weeklyUsage: [[CategoryUsage]]
+    let selectedCategory: CategoryID
+    let days = ["Sunday","Monday", "Tuesday","Wednesday","Thursday","Friday","Saturday"]
+    var body: some View {
+        let maxUsage = getMaxMult2(weeklyUsage: weeklyUsage, category: selectedCategory)
+        VStack {
+            ForEach(weeklyUsage.indices, id: \.self) { index in
+                let dailyUsage = getTotalDailyUsage(usage: weeklyUsage[index], category: selectedCategory)
+                WeeklyBarChartRow(
+                    day: days[index],
+                    usage: dailyUsage,
+                    maxUsage: maxUsage
+                )
+            }
+        }
+    }
+}
+struct HistogramBar: View {
+    let dailyUsage: Int
+    let maxUsage: Int
+    let height: CGFloat?
+    var body: some View {
+        GeometryReader { geo in
+            let availableHeight = geo.size.height
+            let usageHeight = availableHeight * CGFloat(dailyUsage) / CGFloat(maxUsage)
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 3).fill(FocusColors.histogramFill).opacity(0.4)
+                RoundedRectangle(cornerRadius: 3).fill(FocusColors.histogramFill)
+                    .frame(height: ((dailyUsage > maxUsage) ? availableHeight : usageHeight))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3).stroke(Color(red: 0.7, green: 0.56, blue: 0.56), lineWidth: 1)
+                    )
+            }
+        }
+        .frame(height: height)
     }
 }
 struct TotalUsage: View {
@@ -393,7 +702,20 @@ struct BarChartRow: View {
         }.frame(height:11)
     }
 }
-struct BarChartView: View {
+struct WeeklyBarChartRow: View {
+    let day: String
+    let usage: Int
+    let maxUsage: Int
+    var body: some View {
+        HStack(spacing: 0) {
+            Text("\(day)").font(.custom("Poppins", size:12)).frame(maxWidth: 100, alignment: .leading).foregroundStyle(getTextColor())
+            BarChart(usage: usage, maxUsage: maxUsage, height: nil)
+            Text("\(formatSeconds(usage))").frame(maxWidth: 100, alignment: .trailing).font(.custom("Poppins", size:12)).foregroundStyle(getTextColor())
+            
+        }.frame(height:11)
+    }
+}
+struct DailyBarChartView: View {
     let usage: [CategoryUsage]
     var body: some View {
         VStack {
@@ -449,14 +771,18 @@ struct BackButton: View {
         Button {
             dismiss()
         } label: {
-            Text("<").font(.system(size:20, weight:.bold)).frame(minWidth: 32, minHeight: 32).background(FocusColors.background).cornerRadius(16).clipShape(Circle()).foregroundColor(.black)
-        }
+            ZStack {
+                Circle().fill(Color.white).frame(width: 30, height: 30)
+                Image(systemName: "chevron.left").font(.system(size: 14, weight:.semibold))
+                    .foregroundStyle(Color.black)
+            }.frame(width:30, height:30)
+            
+        }.contentShape(Circle())
 
     }
 }
 struct MyGoalsView: View {
     @Binding var usage: [CategoryUsage]
-    
     var body: some View {
         ScrollView {
             ZStack {
@@ -464,12 +790,14 @@ struct MyGoalsView: View {
                     VStack{
                         LimitGoals(usage: $usage)
                         PrioritizeGoals(usage: $usage)
-                    }
-                }
-                .safeAreaInset(edge: .top) {
-                    MyGoalsHeader()
+                        Spacer()
+                    }.padding(.top, 46)
                 }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .navigationBarBackButtonHidden(true)
+                    
+            }
+        }.toolbar {
+            ToolbarItem(placement: .principal) {
+                MyGoalsHeader()
             }
         }.background(
             Image("Goals-List-View").resizable().ignoresSafeArea().aspectRatio(contentMode: .fill)
@@ -484,7 +812,7 @@ struct MyGoalsHeader: View {
         ZStack {
             HStack {
                 Text("My Goals").font(.custom("SortsMillGoudy-Regular",size: 20)).frame(maxWidth:.infinity, alignment:.center)
-            }.frame(maxWidth: .infinity, alignment: .leading).navigationBarBackButtonHidden(true).padding(.leading, 13)
+            }.frame(maxWidth: .infinity, alignment: .leading)
         }
 
     }
@@ -515,15 +843,33 @@ struct ProgressComponent: View {
     var body: some View {
         VStack {
             HStack {
-                Text("\(categoryUsage.id)").font(.custom("Poppins", size:14)).frame(maxWidth:.infinity, alignment: .leading).padding(.leading ,13)
-                Text("\(minutesLeft) min left").font(.custom("Poppins", size:14)).frame(maxWidth:.infinity, alignment: .trailing).padding(.trailing,13)
-            }
-            BarChart(usage:categoryUsage.usage, maxUsage: categoryUsage.maxUsage, height: 30).padding(.horizontal,13)
+                Text("\(categoryUsage.id.title.prefix(1).uppercased() + categoryUsage.id.title.dropFirst())").font(.custom("Poppins-SemiBold", size:14)).frame(maxWidth:.infinity, alignment: .leading).padding(.leading ,22)
+                Text("\(minutesLeft) min left").font(.custom("Poppins", size:14)).frame(maxWidth:.infinity, alignment: .trailing).padding(.trailing,11)
+            }.padding(.top, 20)
+            Spacer()
+            MyGoalsProgressSlider(usage:categoryUsage.usage, maxUsage: categoryUsage.maxUsage, height: 20).padding(.horizontal,22).padding(.bottom, 19)
         }.frame(width: 343).frame(height:118).background(
             RoundedRectangle(cornerRadius:16)
                 .fill(Color(UIColor(red: 1, green: 1, blue: 0.98, alpha: 1)))
                 .shadow(color: .black.opacity(0.25), radius: 2, x: 0, y: 4)
         )
+    }
+}
+struct MyGoalsProgressSlider: View {
+    let usage: Int
+    let maxUsage: Int
+    let height: CGFloat?
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let usageWidth = width * CGFloat(usage) / CGFloat(maxUsage)
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white).stroke(.black, lineWidth: 1)
+                Capsule().fill(FocusColors.barChartFill).stroke(.black, lineWidth: 1)
+                    .frame(width:((usage > maxUsage) ? width : usageWidth))
+                
+            }
+        }.frame(height: height)
     }
 }
 
@@ -583,11 +929,7 @@ struct SetGoalHeader: View {
 
     }
 }
-struct DailyWeeklyToggle: View {
-    var body: some View {
-        EmptyView()
-    }
-}
+
 struct CategoryDropdown: View {
     @Binding var categorySelection: CategoryID
     var body: some View {
@@ -625,7 +967,7 @@ struct GoalDropdown: View {
             } label: {
                 HStack {
                     Text(goalSelection.rawValue).font(.system(size:20, weight:.regular)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading,10)
-                    Image(systemName: "chevron.down").font(.system(size:18)).frame(maxWidth:.infinity, alignment:.trailing).padding(.trailing, 10)
+                    Image(systemName: "chevron.down").font(.system(size:18)).frame(maxWidth:.infinity, alignment: .trailing).padding(.trailing, 10)
                 }.padding(.leading, 13).frame(height:47).background(Color.white).cornerRadius(15)
             }.buttonStyle(.plain)
         }.padding(.horizontal, 13).frame(height:118).background(
@@ -660,7 +1002,7 @@ struct TimeSelectionBar: View {
         HStack {
             RepeatButton(symbol: "-", onTap: {onTap(delta: -step)}, onStartRepeat: {startRepeating(delta: -step)}, onStopRepeat: {stopRepeating()}, size: 60).frame(maxWidth:.infinity, alignment:.leading).padding(.leading, 13)
             Text("\(selectedTime) min").font(.system(size: 32, weight: .medium)).monospacedDigit().frame(width: 120, alignment: .center)
-            RepeatButton(symbol: "+", onTap: {onTap(delta: step)}, onStartRepeat: {startRepeating(delta: step)}, onStopRepeat: {stopRepeating()}, size: 60).frame(maxWidth: .infinity, alignment:.trailing).padding(.trailing, 13)
+            RepeatButton(symbol: "+", onTap: {onTap(delta: step)}, onStartRepeat: {startRepeating(delta: step)}, onStopRepeat: {stopRepeating()}, size: 60).frame(maxWidth: .infinity, alignment: .trailing).padding(.trailing, 13)
         }.frame(maxWidth:.infinity)
     }
     private func change(_ delta: Int) {
@@ -809,11 +1151,30 @@ enum FocusColors {
         startPoint: .leading,
         endPoint: .trailing
     )
+    static let histogramFill = LinearGradient(
+        colors: [
+            Color(red: 0.89, green: 0.86, blue: 0.58),
+            Color(red: 0.96, green: 0.77, blue: 0.5),
+            Color(red: 0.96, green: 0.89, blue: 0.87)
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+    )
     static let setIntentionsFill = LinearGradient(
         colors: [
             Color(red: 0.96, green: 0.89, blue: 0.87),
             Color(red: 0.96, green: 0.77, blue: 0.5),
             Color(red: 0.89, green: 0.86, blue: 0.58)
+        ],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
+    static let progressFill = LinearGradient(
+        colors: [
+            Color(red: 0.89, green: 0.86, blue: 0.58),
+            Color(red: 0.96, green: 0.77, blue: 0.5),
+            Color(red: 0.96, green: 0.89, blue: 0.87)
+
         ],
         startPoint: .leading,
         endPoint: .trailing
@@ -830,6 +1191,7 @@ enum FocusColors {
         blue: 175.0 / 255.0
     )
 }
+
 enum CategoryID: String, Codable, CaseIterable, Identifiable {
     case creativity, connection, drifting, entertainment, productivity, learning
     var id: String{rawValue}
@@ -841,6 +1203,15 @@ enum CategoryID: String, Codable, CaseIterable, Identifiable {
         case .entertainment: return "Entertainment"
         case .productivity: return "Productivity"
         case .learning: return "Learning"
+        }
+    }
+}
+enum Option: Int, CaseIterable {
+    case daily, weekly
+    var title: String {
+        switch self {
+        case .daily: return "Daily"
+        case .weekly: return "Weekly"
         }
     }
 }
@@ -856,14 +1227,79 @@ enum GoalType: String, Codable, CaseIterable, Identifiable {
 }
 struct CategoryUsage: Identifiable, Codable {
     var id: CategoryID
-    var usage: Int
-    var maxUsage: Int
-    var type: GoalType
+    var usage: Int // usage time for the day for the category
+    var maxUsage: Int // max allowed usage time for the day for the category f
+    var type: GoalType // old version(unneeded)
 }
+private func getTotalDailyUsage(usage: [CategoryUsage], category: CategoryID) -> Int {
+    var totalSeconds: Int {
+        usage.filter {$0.id == category}.reduce(0) { $0 + $1.usage }
+    }
+
+    return totalSeconds
+}
+private func getMaxDailyUsageFromWeek(weeklyUsage: [[CategoryUsage]], category: CategoryID) -> Int {
+    weeklyUsage.map { dailyUsage in (getTotalDailyUsage(usage: dailyUsage, category: category))}.max() ?? 0
+}
+private func getMaxMult2(weeklyUsage: [[CategoryUsage]], category: CategoryID) -> Int {
+    Int((Double(getMaxDailyUsageFromWeek(weeklyUsage: weeklyUsage, category: category)) / 3600 / 2).rounded() * 2 * 3600)
+}
+
+private func typeForCategory(_ id: CategoryID) -> GoalType {
+    switch id {
+    case .drifting, .entertainment:
+        return .Limit
+    default:
+        return .Prioritize
+    }
+}
+
+private func usageRange(for id: CategoryID) -> ClosedRange<Int> { // minutes per day
+    switch id {
+    case .connection:
+        return 60...210   // 1–3.5 hours
+    case .creativity:
+        return 45...180   // 45 min – 3 hours
+    case .drifting:
+        return 10...120   // 10 min – 2 hours
+    case .entertainment:
+        return 20...120   // 20 min – 2 hours
+    case .productivity:
+        return 45...210   // 45 min – 3.5 hours
+    case .learning:
+        return 15...120   // 15 min – 2 hours
+    }
+}
+
+private func generateDayUsage() -> [CategoryUsage] {
+    CategoryID.allCases.map { id in
+        let minutes = Int.random(in: usageRange(for: id))
+        return CategoryUsage(
+            id: id,
+            usage: minutes * 60,
+            maxUsage: 5 * 3600,
+            type: typeForCategory(id)
+        )
+    }
+}
+
+private func getDayOfWeekNum(for date: Date = Date()) -> Int {
+    let calendar = Calendar.current
+    let weekdayNumber = calendar.component(.weekday, from: date)
+    return weekdayNumber - 1
+}
+
 func formatSeconds(_ seconds: Int) -> String {
+    let days = seconds / 86400
     let hours = seconds / 3600
     let mins = (seconds % 3600) / 60
-    return String(hours > 0 ? "\(hours) hr \(mins) min" : "\(mins) min")
+    if days > 0 {
+        return "\(days) days \(hours) hr \(mins) mins"
+    } else if hours > 0 {
+        return "\(hours) hr \(mins) mins"
+    } else {
+        return "\(mins) mins"
+    }
 }
 let mockUsage: [CategoryUsage] = [
     .init(id: .creativity, usage: 3600, maxUsage: 7200, type: .Limit),
@@ -923,7 +1359,30 @@ private func getTimeOfDayText() -> String {
         return "tonight"
     }
 }
+private func getIntentionsEditText(id: CategoryID) -> String {
+    switch id.title.lowercased() {
+    case "productivity":
+        return "How much focus time do you need today?"
+    case "connection":
+        return "How much energy for socializing?"
+    case "creativity":
+        return "How much space to create and inspire?"
+    case "entertainment":
+        return "What's the allowance for unwinding?"
+    case "learning":
+        return "How much time for growing your mind?"
+    case "drifting":
+        return "How much time for just wandering?"
+    default:
+        return ""
+    }
+}
+
+enum Route: Hashable {
+    case intentionsEndingPage
+}
 #Preview {
     FocusView()
 
 }
+
