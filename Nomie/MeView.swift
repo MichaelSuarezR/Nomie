@@ -6,138 +6,250 @@
 import SwiftUI
 
 struct MeView: View {
-    @EnvironmentObject var appState: AppState
+    private let inkColor = Color(red: 0.2, green: 0.25, blue: 0.2)
+    private let cardShadow = Color.black.opacity(0.06)
     
-    private let surfaceColor = Color(red: 0.985, green: 0.975, blue: 0.955)
-    private let inkColor = Color(red: 0.12, green: 0.12, blue: 0.12)
-    private let buttonColor = Color.black.opacity(0.08)
+    @State private var currentStreakDays: Int = 8
+    @State private var longestStreakDays: Int = 12
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 32) {
-                    
-                    HStack {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 20, weight: .medium))
-                            .opacity(0)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 12)
-                    
-                    VStack(alignment: .leading, spacing: 24) {
-                        Text("My Dashboard")
-                            .font(.custom("Georgia", size: 34))
+            ZStack(alignment: .topTrailing) {
+                MeTabBackground()
+                
+                Image("planet")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 62, height: 62)
+                    .opacity(0.92)
+                    .padding(.trailing, 24)
+                    .padding(.top, 60)
+                
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        
+                        Text("Me")
+                            .font(.custom("SortsMillGoudy-Regular", size: 52))
                             .foregroundStyle(inkColor)
                             .padding(.horizontal, 24)
+                            .padding(.top, 150)
+                            .padding(.bottom, 24)
                         
-                        VStack(spacing: 20) {
-                            HStack(spacing: 4) {
-                                Text("Streak Status")
-                                    .font(.custom("AvenirNext-Bold", size: 16))
-                                    .foregroundStyle(inkColor)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 24)
-                            
-                            HStack(spacing: 24) {
-                                Text("14 Days")
-                                    .font(.custom("AvenirNext-DemiBold", size: 22))
-                                    .foregroundStyle(inkColor)
-                                    .padding(.vertical, 12)
-                                    .padding(.horizontal, 24)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                            .fill(Color.black.opacity(0.1))
-                                    )
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Longest:")
-                                        .font(.custom("AvenirNext-Medium", size: 16))
-                                        .foregroundStyle(inkColor.opacity(0.7))
-                                    Text("28 Days")
-                                        .font(.custom("AvenirNext-Bold", size: 16))
-                                        .foregroundStyle(inkColor)
-                                }
-                                Spacer()
-                            }
-                            .padding(.horizontal, 24)
-                            
-                            Image("Illustration302 1")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 150)
-                                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-                            
-                            Text("Consistency is key! Keep that\nmomentum going!")
-                                .font(.custom("AvenirNext-Medium", size: 16))
-                                .foregroundStyle(inkColor.opacity(0.8))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
+                        HStack(spacing: 16) {
+                            MeCurrentStreakCard(
+                                streakDays: currentStreakDays,
+                                inkColor: inkColor,
+                                shadowColor: cardShadow
+                            )
+                            MeLongestStreakCard(
+                                streakDays: longestStreakDays,
+                                inkColor: inkColor,
+                                shadowColor: cardShadow
+                            )
                         }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 32)
                         
-                        VStack(spacing: 16) {
+                        VStack(spacing: 12) {
                             NavigationLink(destination: MeFriendsView()) {
-                                MeMenuButton(title: "FRIENDS", color: buttonColor, textColor: inkColor)
-                            }
-                            
-                            NavigationLink(destination: MeSettingsView()) {
-                                MeMenuButton(title: "SETTINGS", color: buttonColor, textColor: inkColor)
-                            }
-                            
-                            NavigationLink(destination: MeStampsView()) {
-                                MeMenuButton(title: "STAMPS", color: buttonColor, textColor: inkColor)
+                                MeMenuButton(title: "Friends", inkColor: inkColor, shadowColor: cardShadow)
                             }
                             
                             NavigationLink(destination: MeGoalsView()) {
-                                MeMenuButton(title: "MANAGE GOALS", color: buttonColor, textColor: inkColor)
+                                MeMenuButton(title: "Manage Goals", inkColor: inkColor, shadowColor: cardShadow)
+                            }
+                            
+                            NavigationLink(destination: MeStampsView()) {
+                                MeMenuButton(title: "Stamps", inkColor: inkColor, shadowColor: cardShadow)
+                            }
+                            
+                            NavigationLink(destination: MeSettingsView()) {
+                                MeMenuButton(title: "Settings", inkColor: inkColor, shadowColor: cardShadow)
                             }
                         }
                         .padding(.horizontal, 24)
-                        .padding(.top, 12)
                         
-                        Button(action: {
-                            Task { await appState.signOut() }
-                        }) {
-                            Text("Sign Out")
-                                .font(.custom("AvenirNext-Medium", size: 14))
-                                .foregroundStyle(.red.opacity(0.7))
-                                .underline()
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 20)
-                        
-                        Spacer().frame(height: 40)
+                        Color.clear.frame(height: 120)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .nomieTabBarContentPadding()
-            .background(surfaceColor.ignoresSafeArea())
         }
     }
 }
 
 
-struct MeMenuButton: View {
+private struct MeTabBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: Color(red: 0.98, green: 0.94, blue: 0.80), location: 0.0),
+                    .init(color: Color(red: 0.95, green: 0.97, blue: 0.90), location: 0.56),
+                    .init(color: Color(red: 0.99, green: 0.93, blue: 0.88), location: 1.0)
+                ],
+                startPoint: .topLeading,
+                endPoint: .topTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(red: 0.98, green: 0.83, blue: 0.67).opacity(0.42),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.66, y: 0.72),
+                startRadius: 24,
+                endRadius: 380
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(red: 0.97, green: 0.74, blue: 0.66).opacity(0.28),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.94, y: 0.70),
+                startRadius: 18,
+                endRadius: 260
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(red: 0.98, green: 0.90, blue: 0.66).opacity(0.30),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.12, y: 0.04),
+                startRadius: 12,
+                endRadius: 220
+            )
+        }
+        .ignoresSafeArea()
+    }
+}
+
+private struct MeCurrentStreakCard: View {
+    let streakDays: Int
+    let inkColor: Color
+    let shadowColor: Color
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image("Streak")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                
+                Text("Streaks")
+                    .font(.custom("AvenirNext-Medium", size: 16))
+                    .foregroundStyle(inkColor)
+            }
+            .padding(.top, 24)
+            
+            Spacer(minLength: 0)
+            
+            Text("\(streakDays)")
+                .font(.custom("AvenirNext-Bold", size: 76))
+                .foregroundStyle(
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color(red: 0.98, green: 0.53, blue: 0.42), location: 0.02),
+                            .init(color: Color(red: 0.97, green: 0.66, blue: 0.38), location: 0.48),
+                            .init(color: Color(red: 0.90, green: 0.72, blue: 0.36), location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+            
+            Text(streakDays == 1 ? "Day" : "Days")
+                .font(.custom("AvenirNext-Medium", size: 16))
+                .foregroundStyle(inkColor)
+                .padding(.top, -15)
+            
+            Spacer(minLength: 0)
+            
+            Text("Keep that momentum\ngoing!")
+                .font(.custom("AvenirNext-Regular", size: 12))
+                .foregroundStyle(inkColor.opacity(0.8))
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 20)
+                .padding(.horizontal, 8)
+        }
+        .frame(maxWidth: .infinity, minHeight: 220, maxHeight: 220)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.95))
+                .shadow(color: shadowColor, radius: 8, x: 0, y: 4)
+        )
+    }
+}
+
+private struct MeLongestStreakCard: View {
+    let streakDays: Int
+    let inkColor: Color
+    let shadowColor: Color
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            
+            Image("active")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 90, height: 90)
+            
+            Spacer()
+            
+            VStack(spacing: 4) {
+                Text("Longest Streak:")
+                    .font(.custom("AvenirNext-Regular", size: 14))
+                    .foregroundStyle(inkColor)
+                
+                Text("\(streakDays) " + (streakDays == 1 ? "Day" : "Days"))
+                    .font(.custom("AvenirNext-Regular", size: 14))
+                    .foregroundStyle(inkColor)
+            }
+            .padding(.bottom, 24)
+        }
+        .frame(maxWidth: .infinity, minHeight: 220, maxHeight: 220)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.94, green: 0.96, blue: 0.84),
+                            Color(red: 0.98, green: 0.82, blue: 0.78)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: shadowColor, radius: 8, x: 0, y: 4)
+        )
+    }
+}
+
+private struct MeMenuButton: View {
     let title: String
-    let color: Color
-    let textColor: Color
+    let inkColor: Color
+    let shadowColor: Color
     
     var body: some View {
         Text(title)
-            .font(.custom("AvenirNext-DemiBold", size: 18))
-            .foregroundStyle(textColor)
+            .font(.custom("AvenirNext-Regular", size: 16))
+            .foregroundStyle(inkColor)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
+            .padding(.vertical, 14)
             .background(
-                Capsule()
-                    .fill(color)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.white.opacity(0.95))
+                    .shadow(color: shadowColor, radius: 4, x: 0, y: 2)
             )
     }
 }
 
 #Preview {
     MeView()
-        .environmentObject(AppState())
 }

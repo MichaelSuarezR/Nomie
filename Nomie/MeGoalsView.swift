@@ -8,128 +8,191 @@ import SwiftUI
 struct MeGoalsView: View {
     @Environment(\.dismiss) var dismiss
     
-    private let surfaceColor = Color(red: 0.985, green: 0.975, blue: 0.955)
-    private let inkColor = Color(red: 0.12, green: 0.12, blue: 0.12)
-    private let cardColor = Color(red: 0.85, green: 0.85, blue: 0.85)
-    private let buttonColor = Color.black.opacity(0.1)
+    private let inkColor = Color(red: 0.2, green: 0.25, blue: 0.2)
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 32) {
-                
-                HStack(spacing: 16) {
+        ZStack {
+            MeGoalsBackground()
+            
+            VStack(spacing: 0) {
+                HStack {
                     Button(action: {
                         dismiss()
                     }) {
                         Image(systemName: "arrow.left")
-                            .font(.system(size: 24, weight: .medium))
+                            .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(inkColor)
+                            .frame(width: 44, height: 44, alignment: .leading)
                     }
+                    
+                    Spacer()
+                    
+                    Text("Manage Goals")
+                        .font(.custom("SortsMillGoudy-Regular", size: 30))
+                        .foregroundStyle(inkColor)
+                        .padding(.trailing, 44)
+                    
                     Spacer()
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 12)
+                .padding(.top, 60)
+                .padding(.bottom, 24)
                 
-                VStack(alignment: .leading, spacing: 24) {
-                    Text("My Goals")
-                        .font(.custom("Georgia", size: 34))
-                        .foregroundStyle(inkColor)
-                        .padding(.horizontal, 24)
-                    
-                    VStack(spacing: 0) {
-                        VStack(spacing: 8) {
-                            Text("Weekly Screentime")
-                                .font(.custom("AvenirNext-Medium", size: 18))
-                                .foregroundStyle(inkColor.opacity(0.8))
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        
+                        VStack(spacing: 32) {
                             
-                            Text("4H 32M")
-                                .font(.custom("AvenirNext-Bold", size: 56))
-                                .foregroundStyle(inkColor)
+                            VStack(spacing: 4) {
+                                Text("Weekly Screentime")
+                                    .font(.custom("SortsMillGoudy-Regular", size: 24))
+                                    .foregroundStyle(inkColor)
+                                
+                                Text("4H 32M")
+                                    .font(.custom("SortsMillGoudy-Regular", size: 60))
+                                    .foregroundStyle(inkColor)
+                            }
+                            .padding(.top, 16)
+                            
+                            VStack(spacing: 12) {
+                                GoalsProgressBar(progress: 0.50)
+                                
+                                HStack {
+                                    Text("Goal Progress")
+                                        .font(.custom("AvenirNext-DemiBold", size: 14))
+                                        .foregroundStyle(inkColor)
+                                    Spacer()
+                                    Text("50%")
+                                        .font(.custom("AvenirNext-Regular", size: 14))
+                                        .foregroundStyle(inkColor)
+                                }
+                            }
+                            
+                            Text("You are on track to meet your goal!")
+                                .font(.custom("AvenirNext-Regular", size: 14))
+                                .foregroundStyle(inkColor.opacity(0.7))
+                                .padding(.bottom, 16)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 32)
+                        .padding(24)
                         .background(
-                            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                .fill(cardColor)
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color.white.opacity(0.96))
+                                .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 4)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(Color.black.opacity(0.05), lineWidth: 1)
                         )
                         .padding(.horizontal, 24)
                         
-                        VStack(spacing: 12) {
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    Capsule()
-                                        .fill(Color.gray.opacity(0.3))
-                                        .frame(height: 16)
-                                    
-                                    Capsule()
-                                        .fill(inkColor)
-                                        .frame(width: geometry.size.width * 0.5, height: 16)
-                                }
-                            }
-                            .frame(height: 16)
-                            
-                            HStack {
-                                Text("GOAL PROGRESS")
-                                    .font(.custom("AvenirNext-BoldItalic", size: 14))
-                                    .foregroundStyle(inkColor)
-                                Spacer()
-                                Text("50%")
-                                    .font(.custom("AvenirNext-BoldItalic", size: 14))
-                                    .foregroundStyle(inkColor)
-                            }
-                            
-                            Text("You are ON TRACK to meet your goal!")
-                                .font(.custom("AvenirNext-MediumItalic", size: 14))
-                                .foregroundStyle(inkColor.opacity(0.8))
-                                .padding(.top, 8)
-                        }
-                        .padding(.horizontal, 32)
-                        .padding(.top, 24)
-                        
-                    }
-                    
-                    VStack(spacing: 16) {
                         Button(action: {
                         }) {
-                            Text("EDIT ZINE PREFERENCES")
-                                .font(.custom("AvenirNext-DemiBold", size: 16))
+                            Text("Set Goals")
+                                .font(.custom("AvenirNext-Regular", size: 16))
                                 .foregroundStyle(inkColor)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .background(Capsule().fill(buttonColor))
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(Color.white.opacity(0.96))
+                                        .shadow(color: Color.black.opacity(0.06), radius: 4, x: 0, y: 2)
+                                )
                         }
+                        .padding(.horizontal, 24)
                         
-                        Button(action: {
-                        }) {
-                            Text("EDIT MY GOALS")
-                                .font(.custom("AvenirNext-DemiBold", size: 16))
-                                .foregroundStyle(inkColor)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Capsule().fill(buttonColor))
-                        }
                     }
-                    .padding(.horizontal, 48)
-                    .padding(.top, 12)
                     
-                    HStack {
-                        Spacer()
-                        Image("Illustration300 1")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 140)
-                            .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 10)
-                            .opacity(0.9)
-                        Spacer()
-                    }
-                    .padding(.top, 12)
-                    
-                    Spacer().frame(height: 40)
+                    Color.clear.frame(height: 120)
                 }
             }
         }
-        .background(surfaceColor.ignoresSafeArea())
         .navigationBarBackButtonHidden(true)
+    }
+}
+
+struct GoalsProgressBar: View {
+    let progress: CGFloat
+    
+    var body: some View {
+        GeometryReader { proxy in
+            let fillWidth = max(24, proxy.size.width * progress)
+            
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(red: 0.91, green: 0.94, blue: 0.82))
+                    .frame(height: 16)
+                
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.98, green: 0.82, blue: 0.66),
+                                Color(red: 0.94, green: 0.76, blue: 0.74)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 16)
+                    .mask(
+                        Capsule()
+                            .frame(width: fillWidth, height: 16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    )
+                
+                Capsule()
+                    .stroke(Color(red: 0.64, green: 0.49, blue: 0.45), lineWidth: 1)
+                    .frame(width: fillWidth, height: 16)
+            }
+        }
+        .frame(height: 16)
+    }
+}
+
+private struct MeGoalsBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: Color(red: 0.98, green: 0.94, blue: 0.80), location: 0.0),
+                    .init(color: Color(red: 0.95, green: 0.97, blue: 0.90), location: 0.56),
+                    .init(color: Color(red: 0.99, green: 0.93, blue: 0.88), location: 1.0)
+                ],
+                startPoint: .topLeading,
+                endPoint: .topTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(red: 0.98, green: 0.83, blue: 0.67).opacity(0.42),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.66, y: 0.72),
+                startRadius: 24,
+                endRadius: 380
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(red: 0.97, green: 0.74, blue: 0.66).opacity(0.28),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.94, y: 0.70),
+                startRadius: 18,
+                endRadius: 260
+            )
+
+            RadialGradient(
+                colors: [
+                    Color(red: 0.98, green: 0.90, blue: 0.66).opacity(0.30),
+                    Color.clear
+                ],
+                center: UnitPoint(x: 0.12, y: 0.04),
+                startRadius: 12,
+                endRadius: 220
+            )
+        }
+        .ignoresSafeArea()
     }
 }
 
