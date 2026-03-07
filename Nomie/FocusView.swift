@@ -32,12 +32,7 @@ struct FocusView: View {
             )
         }
         .navigationTitle("Focus")
-        .navigationDestination(for: Route.self) { route in
-            switch route {
-            case .intentionsEndingPage:
-                IntentionsEndingPage()
-            }
-        }
+
 
     }
 }
