@@ -7,10 +7,10 @@ import SwiftUI
 import Foundation
 import Combine
 struct FocusView: View {
-    @State private var path = NavigationPath()
+    @State private var path: [Route] = []
     @State private var weeklyUsage: [[CategoryUsage]]
     @State private var usage: [CategoryUsage]
-
+    
     init() {
         let weekly = (0..<7).map { _ in generateDayUsage() }
         _weeklyUsage = State(initialValue: weekly)
@@ -22,7 +22,7 @@ struct FocusView: View {
             ScrollView {
                 VStack {
                     FocusHeader(name: "Nomie")
-                    DashboardWrapper(streakDays: 8, category: "Creativity", timeOfDay: getTimeOfDayText(), usage: $usage, weeklyUsage: weeklyUsage)
+                    DashboardWrapper(streakDays: 8, category: "Creativity", timeOfDay: getTimeOfDayText(), usage: $usage, weeklyUsage: weeklyUsage, navPath: $path)
                 }
                 .nomieTabBarContentPadding()
             }
@@ -30,7 +30,20 @@ struct FocusView: View {
             .background(
                 Image("sunset").resizable().ignoresSafeArea().aspectRatio(contentMode: .fill).offset(x:300).scaleEffect(x: -1,y: 1)
             )
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .intentionsLanding:
+                    IntentionsLandingPage(usage: $usage)
+                case .intentionsEdit(let page):
+                    IntentionsEditPage(usage: $usage, currentPage: page)
+                case .intentionsEnding:
+                    IntentionsEndingPage(navPath: $path)
+                case .goalsListEdit:
+                    GoalsListEditView(usage: $usage, navPath: $path)
+                }
+            }
         }
+
         .navigationTitle("Focus")
 
 
@@ -43,11 +56,12 @@ struct DashboardWrapper: View {
     let timeOfDay: String
     @Binding var usage: [CategoryUsage]
     let weeklyUsage: [[CategoryUsage]]
+    @Binding var navPath: [Route]
 
     var body: some View {
         VStack(spacing: 24) {
             StreaksBar(streakDays: 8)
-            WeeklyIntentions(usage: $usage)
+            WeeklyIntentions(usage: $usage, navPath: $navPath)
             Charts(usage: usage, weeklyUsage: weeklyUsage)
             DailyInsights(category: "Creativity", timeOfDay: timeOfDay)
             //GoalsView(usage: $usage)
@@ -82,7 +96,7 @@ struct StreaksBar : View {
             Text("Streaks:" )
             .font(.system(size:14, weight: .medium))
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 10.5)
+                .padding(.vertical, 10.5).foregroundStyle(getTextColor())
             HStack {
                 Text("\(streakDays)")
                     .font(.custom("BricolageGrotesque-96ptExtraBold_Regular", size: 32)
@@ -93,7 +107,7 @@ struct StreaksBar : View {
                 Text("days")
                     .font(.system(size:14, weight: .medium))
                     .frame(alignment: .trailing)
-                    .padding(.vertical, 10.5)
+                    .padding(.vertical, 10.5).foregroundStyle(getTextColor())
             }
             
             
@@ -114,6 +128,7 @@ struct BannerItem: Identifiable, Equatable {
 
 struct WeeklyIntentions: View {
     @Binding var usage: [CategoryUsage]
+    @Binding var navPath: [Route]
     var body: some View {
         VStack (alignment: .center, spacing: 24){
             HStack {
@@ -124,13 +139,13 @@ struct WeeklyIntentions: View {
                 Text("Weekly Intention").font(.custom("SortsMillGoudy-Regular", size: 20))
                     .foregroundColor(getTextColor())
                     .frame(maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .topLeading)
-                EditButton(usage: $usage)
+                //EditButton(usage: $usage, navPath: $navPath)
 
             }
             Text("New week, new canvas. Let's curate your intentions for the week of \(getWeekText())").font(Font.custom("Poppins", size: 14))
                 .foregroundColor(getTextColor())
                 .frame(maxWidth: .infinity, alignment: .topLeading)
-            SetIntentionsButton(usage: $usage)
+            SetIntentionsButton(usage: $usage, navPath: $navPath)
         }.padding(.horizontal, 12)
             .padding(.vertical, 16)
             .frame(maxWidth: .infinity, alignment: .top)
@@ -141,15 +156,16 @@ struct WeeklyIntentions: View {
 }
 struct EditButton: View {
     @Binding var usage: [CategoryUsage]
+    @Binding var navPath: [Route]
+
     var body: some View {
-        NavigationLink {
-            MyGoalsView(usage: $usage)
-        } label: {
+        NavigationLink(value: Route.goalsListEdit) {
             Image("edit").frame(width: 20.17158, height: 20.17157)
         }
     }
 }
 struct IntentionsEndingPage: View {
+    @Binding var navPath: [Route]
     var body: some View {
         VStack {
             Text("Your canvas is set.").font(
@@ -163,7 +179,7 @@ struct IntentionsEndingPage: View {
               .font(Font.custom("Poppins", size: 14))
               .foregroundColor(getTextColor())
               .frame(maxWidth: .infinity, alignment: .topLeading)
-            BackToDashboardButton().frame(maxWidth:.infinity, alignment:.trailing).padding(.top, 114).padding(.trailing, 16)
+            BackToDashboardButton(navPath: $navPath, text: "Back to dashboard").frame(maxWidth:.infinity, alignment:.trailing).padding(.top, 114).padding(.trailing, 16)
         }
         .frame(maxHeight:.infinity, alignment:.top)
         .padding(.top, 232).padding(.leading, 16).ignoresSafeArea(edges: .top)
@@ -173,22 +189,35 @@ struct IntentionsEndingPage: View {
     }
 }
 struct BackToDashboardButton: View {
+    @Binding var navPath: [Route]
+    let text: String
     var body: some View {
-        NavigationLink {
+        let buttonWidth = text == "Back to Dashboard" ? 194 : 103
+        Button {
+            withAnimation {
+                navPath.removeAll()
+            }
         } label: {
-            Text("Back to dashboard").font(.custom("SortsMillGoudy-Regular", size: 16)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment:.center).padding(.horizontal, 32)
-                .padding(.top, 4).foregroundColor(.black)
-        }.frame(width: 194, height: 34).padding(.horizontal, 32)
-            .padding(.top, 4)
-            .padding(.bottom, 6)
-            .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
-            .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
-            .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
-            .overlay(
+            Text("\(text)")
+                .font(.custom("SortsMillGoudy-Regular", size: 16))
+                .foregroundStyle(getTextColor())
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 32)
+                .padding(.top, 4)
+                .foregroundColor(.black)
+        }
+        .frame(width: CGFloat(buttonWidth), height: 34)
+        .padding(.horizontal, 32)
+        .padding(.top, 4)
+        .padding(.bottom, 6)
+        .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
+        .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
+        .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
+        .overlay(
             RoundedRectangle(cornerRadius: 4)
-            .inset(by: 0.5)
-            .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
-            )
+                .inset(by: 0.5)
+                .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
+        )
     }
 }
 struct IntentionsLandingPage: View {
@@ -218,9 +247,7 @@ struct IntentionsLandingPage: View {
 struct LetsStartButton: View {
     @Binding var usage: [CategoryUsage]
     var body: some View {
-        NavigationLink {
-            IntentionsEditPage(usage: $usage, currentPage: 0)
-        } label: {
+        NavigationLink(value: Route.intentionsEdit(page: 0)) {
             Text("Let’s Start")
               .font(Font.custom("SortsMillGoudy-Regular", size: 16))
               .foregroundColor(getTextColor())
@@ -250,71 +277,152 @@ struct IntentionsView: View {
 struct IntentionsEditPage: View {
     @Binding var usage: [CategoryUsage]
     var currentPage: Int
+    @State private var sliderValue: Double = 0.2
     var body: some View {
         VStack {
-            ProgressBar(usage: $usage, pageNum: usage.count, currentPage: currentPage).padding(.trailing, 16).padding(.top, 74)
-            Text(getIntentionsEditText(id: usage[currentPage].id)).font(Font.custom("SortsMillGoudy-Regular", size: 20))
-                .foregroundColor(getTextColor()).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 170)
-            Spacer()
-            NextButton(usage: $usage, currentPage: currentPage)
-        }.frame(maxWidth: .infinity, maxHeight:.infinity, alignment: .top).padding(.leading, 16).ignoresSafeArea(edges: .top).background(Image("Intentions-Edit-Background").resizable().aspectRatio(contentMode: .fill).ignoresSafeArea()).navigationBarBackButtonHidden(true)
+            ProgressBar(usage: $usage, pageNum: usage.count, currentPage: currentPage).padding(.top, 74)
+            HStack {
+                Text(getIntentionsEditText(id: usage[currentPage].id)).font(Font.custom("SortsMillGoudy-Regular", size: 20))
+                    .foregroundColor(getTextColor()).frame(maxWidth: .infinity, alignment: .leading).padding(.top, 170)
+
+            }
+            HStack {
+                Text("\(usage[currentPage].id.title)").font(.custom("Poppins-SemiBold", size: 14)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment: .leading)
+                Text("\(formatSeconds(usage[currentPage].maxUsage))").font(.custom("Poppins", size: 14)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            IntentionsEditBlock(value: $sliderValue, progress: $sliderValue)
+                .frame(height: 36)
+                .padding(.top, 24)
+                .onAppear {
+                    let minM = 30.0
+                    let maxM = 180.0
+                    let currentM = Double(usage[currentPage].maxUsage) / 60.0
+                    let clampedM = min(max(currentM, minM), maxM)
+                    sliderValue = (clampedM - minM) / (maxM - minM)
+                }
+                .onChange(of: sliderValue) { newVal in
+                    let minM = 30.0
+                    let maxM = 180.0
+                    let minutes = minM + newVal * (maxM - minM)
+                    usage[currentPage].maxUsage = Int(round(minutes)) * 60
+                }
+            NextDoneButton(usage: $usage, currentPage: currentPage)
+        }.frame(maxWidth: .infinity, maxHeight:.infinity, alignment: .top).padding(.leading, 26).padding(.trailing,24).ignoresSafeArea(edges: .top).background(Image("Intentions-Edit-Background").resizable().aspectRatio(contentMode: .fill).ignoresSafeArea()).navigationBarBackButtonHidden(true)
     }
 }
 struct IntentionsEditBlock: View {
     @Binding var value: Double
-    var thumbWidth: CGFloat = 320
+    var thumbWidth: CGFloat = 22
     var height: CGFloat = 36
     var horizontalPadding: CGFloat = 10
+    @Binding var progress: Double
     var body: some View {
         GeometryReader { geo in
-            let trackWidth = geo.size.width
-            let usableWidth = trackWidth - 2 * horizontalPadding
+            let trackTotalWidth = geo.size.width - 2 * horizontalPadding
             let clamped = min(max(value, 0), 1)
-            let thumbX = horizontalPadding + clamped * (usableWidth - thumbWidth)
-            
+            let thumbCenterX = horizontalPadding + clamped * trackTotalWidth
+
             ZStack(alignment: .leading) {
-                Capsule().fill(FocusColors.barChartFill)
+                // Track
+                Capsule()
+                    .fill(Color.white.opacity(0.95))
+                    .overlay(
+                        Capsule()
+                            .stroke(Color(red: 0.67, green: 0.56, blue: 0.62), lineWidth: 1)
+                    )
+                    .frame(height: 10)
+                    .frame(maxHeight: .infinity, alignment: .center)
+
+                // Filled progress
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.91, green: 0.78, blue: 0.54),
+                                Color(red: 0.95, green: 0.72, blue: 0.47)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(Color(red: 0.67, green: 0.56, blue: 0.62), lineWidth: 3)
+                    )
+                    .frame(width: max(22, clamped * trackTotalWidth), height: 10)
+                    .frame(maxHeight: .infinity, alignment: .center)
+
+                // Thumb
+                Circle()
+                    .fill(Color(red: 0.96, green: 0.73, blue: 0.48))
+                    .overlay(
+                        Circle()
+                            .stroke(Color(red: 0.67, green: 0.56, blue: 0.62), lineWidth: 3)
+                    )
+                    .frame(width: thumbWidth, height: thumbWidth)
+                    .position(x: thumbCenterX, y: geo.size.height / 2)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { gesture in
+                                let minX = horizontalPadding
+                                let maxX = geo.size.width - horizontalPadding
+                                let x = min(max(gesture.location.x, minX), maxX)
+                                let newValue = (x - horizontalPadding) / max(1, trackTotalWidth)
+                                value = newValue
+                                progress = newValue
+                            }
+                    )
             }
-            
         }
+        .frame(height: height)
     }
 }
-struct IntentionsSliderBar: View {
-    var body: some View {
-    }
-}
-struct NextButton: View {
+
+
+struct NextDoneButton: View {
     @Binding var usage: [CategoryUsage]
     var currentPage: Int
+    var text: String? = nil
     var body: some View {
-        NavigationLink {
-            if currentPage >= 5 {
-                IntentionsEndingPage()
-            } else {
-                IntentionsEditPage(usage: $usage, currentPage: currentPage + 1)
-            }
-        } label: {
-            Text("Next").font(.custom("SortsMillGoudy-Regular", size: 16)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment:.center).padding(.horizontal, 32)
-                .padding(.top, 4).foregroundColor(.black)
-        }.frame(width: 98, height: 34).padding(.horizontal, 32)
-            .padding(.top, 4)
-            .padding(.bottom, 6)
-            .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
-            .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
-            .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
-            .overlay(
+        let nextRoute: Route = (currentPage >= 5) ? .intentionsEnding : .intentionsEdit(page: currentPage + 1)
+        let buttonText = text ?? (currentPage == 5 ? "Done" : "Next")
+        NavigationLink(value: nextRoute) {
+            Text("\(buttonText)")
+                .font(.custom("SortsMillGoudy-Regular", size: 16))
+                .foregroundStyle(getTextColor())
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 32)
+                .padding(.top, 4)
+                .foregroundColor(.black)
+        }
+        .frame(width: 98, height: 34)
+        .padding(.horizontal, 32)
+        .padding(.top, 4)
+        .padding(.bottom, 6)
+        .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
+        .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
+        .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
+        .overlay(
             RoundedRectangle(cornerRadius: 4)
-            .inset(by: 0.5)
-            .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
-            )
+                .inset(by: 0.5)
+                .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
+        )
     }
 }
 struct ProgressBar: View {
     @Binding var usage: [CategoryUsage]
+    @Environment(\.dismiss) private var dismiss
     var pageNum: Int
     var currentPage: Int
     var body: some View {
         HStack(spacing: 10) {
+            Button {
+                if currentPage >= 1 {
+                    dismiss()
+                }
+            } label: {
+                Image("backArrow").resizable().scaledToFit().frame(width: 24, height: 24)
+            }
             ForEach(0..<pageNum, id:\.self) { index in
                 RoundedRectangle(cornerRadius: 12).fill(
                     index == currentPage ?
@@ -410,6 +518,7 @@ struct DailyWeeklyToggle: View {
         .buttonStyle(.plain)
     }
 }
+
 struct Charts: View {
     let usage: [CategoryUsage]
     @State private var choice: Option = .daily
@@ -739,24 +848,39 @@ struct GoalsView: View {
 */
 struct SetIntentionsButton: View {
     @Binding var usage: [CategoryUsage]
-    var body: some View {
-        NavigationLink {
-            IntentionsLandingPage(usage: $usage)
-        } label: {
-            Text("Set Intentions").font(.custom("SortsMillGoudy-Regular", size: 16)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment:.center).padding(.horizontal, 32)
-                .padding(.top, 4).foregroundColor(.black)
-        }.frame(width: 161, height: 34).padding(.horizontal, 32)
-            .padding(.top, 4)
-            .padding(.bottom, 6)
-            .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
-            .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
-            .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
-            .overlay(
-            RoundedRectangle(cornerRadius: 4)
-            .inset(by: 0.5)
-            .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
-            )
+    @Binding var navPath: [Route]
+    @AppStorage("hasSeenIntentionsLanding") private var hasSeenIntentionsLanding: Bool = false
 
+    var body: some View {
+        Button {
+            if hasSeenIntentionsLanding {
+                navPath.append(.goalsListEdit)
+            } else {
+                navPath.append(.intentionsLanding)
+                hasSeenIntentionsLanding = true
+            }
+        } label: {
+            Text("Set Intentions")
+                .font(.custom("SortsMillGoudy-Regular", size: 16))
+                .foregroundStyle(getTextColor())
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 32)
+                .padding(.top, 4)
+                .foregroundColor(.black)
+        }
+        .frame(width: 161, height: 34)
+        .padding(.horizontal, 32)
+        .padding(.top, 4)
+        .padding(.bottom, 6)
+        .background(RoundedRectangle(cornerRadius: 4).fill(FocusColors.setIntentionsFill))
+        .shadow(color: Color(red: 0.4, green: 0.48, blue: 0.03).opacity(0.25), radius: 2, x: 0, y: 2)
+        .shadow(color: Color(red: 0.82, green: 0.86, blue: 0.7), radius: 2, x: 0, y: 0)
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .inset(by: 0.5)
+                .stroke(Color(red: 1, green: 1, blue: 0.98), lineWidth: 1)
+        )
+        .buttonStyle(.plain)
     }
 }
 
@@ -776,29 +900,50 @@ struct BackButton: View {
 
     }
 }
-struct MyGoalsView: View {
+struct GoalsListEditView: View {
     @Binding var usage: [CategoryUsage]
+    @Binding var navPath: [Route]
+
     var body: some View {
         ScrollView {
-            ZStack {
-                VStack {
-                    VStack{
-                        LimitGoals(usage: $usage)
-                        PrioritizeGoals(usage: $usage)
-                        Spacer()
-                    }.padding(.top, 46)
-                }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    
-            }
-        }.toolbar {
-            ToolbarItem(placement: .principal) {
-                MyGoalsHeader()
-            }
+            VStack {
+                VStack{
+                    VStack (spacing: 24){
+                        ForEach(usage.indices, id: \.self) { index in
+                            let minM = 30.0
+                            let maxM = 180.0
+                            let sliderBinding = Binding<Double>(
+                                get: {
+                                    let currentM = Double(usage[index].maxUsage) / 60.0
+                                    let clampedM = min(max(currentM, minM), maxM)
+                                    return (clampedM - minM) / (maxM - minM)
+                                },
+                                set: { newVal in
+                                    let minutes = minM + newVal * (maxM - minM)
+                                    usage[index].maxUsage = Int(round(minutes)) * 60
+                                }
+                            )
+                            HStack {
+                                Text("\(usage[index].id.title)").font(.custom("SortsMillGoudy-Regular", size: 20)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment: .leading)
+                                Text("\(formatSeconds(usage[index].maxUsage))").font(.custom("Poppins", size: 14)).foregroundStyle(getTextColor()).frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                            IntentionsEditBlock(value: sliderBinding, progress: sliderBinding)
+                                .frame(height: 36)
+                        }
+                    }
+                    BackToDashboardButton(navPath: $navPath, text: "Done").frame(maxWidth:.infinity, alignment: .trailing).padding(.top, 56)
+                }.padding(.horizontal, 16)
+                    .padding(.vertical, 24)
+                    .frame(width: 352, alignment: .top)
+                    .background(Color(red: 1, green: 1, blue: 0.98))
+                    .cornerRadius(8)
+                    .shadow(color: .black.opacity(0.25), radius: 4.45, x: 0, y: 0)
+            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top).padding(.bottom, 156).padding(.top, 40)
+                
+            
         }.background(
             Image("Goals-List-View").resizable().ignoresSafeArea().aspectRatio(contentMode: .fill)
-        ).overlay(alignment: .bottomTrailing) {
-            AddGoalButton(usage: $usage)
-        }
+        )
     }
 }
 
@@ -918,7 +1063,7 @@ struct SetGoalHeader: View {
         ZStack {
             BackButton().frame(maxWidth:.infinity, alignment: .leading).padding(.leading, 13)
             HStack {
-                Text("Set a Goal").font(.system(size: 32, weight:.medium)).frame(maxWidth:.infinity, alignment:.center)
+                Text("Set a Goal").font(.system(size: 32, weight:.medium)).frame(maxWidth:.infinity, alignment: .center)
             }.frame(maxWidth: .infinity, alignment: .leading).navigationBarBackButtonHidden(true).padding(.leading, 13)
         }
 
@@ -939,7 +1084,7 @@ struct CategoryDropdown: View {
             } label: {
                 HStack {
                     Text(categorySelection.rawValue).font(.system(size:20, weight:.regular)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading,10)
-                    Image(systemName: "chevron.down").font(.system(size:18)).frame(maxWidth:.infinity, alignment:.trailing).padding(.trailing, 10)
+                    Image(systemName: "chevron.down").font(.system(size:18)).frame(maxWidth:.infinity, alignment: .trailing).padding(.trailing, 10)
                 }.padding(.leading, 13).frame(height:47).background(Color.white).cornerRadius(15)
             }.buttonStyle(.plain)
         }.padding(.horizontal, 13).frame(height:118).background(
@@ -1086,7 +1231,7 @@ struct RepeatButton: View {
 struct SaveButton: View {
     
     var body: some View {
-        Text("Save Goal").font(.system(size:24, weight:.regular)).frame(maxWidth:.infinity).frame(height: 60)
+        Text("Save").font(.system(size:24, weight:.regular)).frame(maxWidth:.infinity).frame(height: 60)
             .background(
                 RoundedRectangle(cornerRadius:10, style: .continuous).fill(FocusColors.background)
             )
@@ -1272,7 +1417,7 @@ private func generateDayUsage() -> [CategoryUsage] {
         return CategoryUsage(
             id: id,
             usage: minutes * 60,
-            maxUsage: 5 * 3600,
+            maxUsage: 3 * 3600,
             type: typeForCategory(id)
         )
     }
@@ -1374,7 +1519,10 @@ private func getIntentionsEditText(id: CategoryID) -> String {
 }
 
 enum Route: Hashable {
-    case intentionsEndingPage
+    case intentionsLanding
+    case intentionsEdit(page: Int)
+    case intentionsEnding
+    case goalsListEdit
 }
 #Preview {
     FocusView()
