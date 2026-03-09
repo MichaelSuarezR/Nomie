@@ -84,6 +84,13 @@ struct ReflectView: View {
     @State private var journalDeepLinkToken: UUID? = nil
     private let topScrollID = "reflect.top.scroll.id"
     private let calendar = Calendar.current
+    private let placeholderDriftHours: CGFloat = 3
+    private let chartWeekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEEEE"
+        return formatter
+    }()
     private let tabBarColor = ReflectPalette.warmWhite
     private let inkColor = ReflectPalette.brown
     private let accentColor = ReflectPalette.primaryGreen
@@ -208,32 +215,34 @@ struct ReflectView: View {
 
         return (0..<7).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -6 + offset, to: today) else {
-                return CGFloat(3)
+                return CGFloat(0)
             }
             let key = ReflectDateKey(date: date, calendar: calendar)
-            guard ReflectMoodLevelStore.hasLevels(for: key) else { return CGFloat(3) }
+            guard ReflectMoodLevelStore.hasLevels(for: key) else { return CGFloat(0) }
             let levels = ReflectMoodLevelStore.loadLevels(for: key, defaults: fallbackLevels)
             return moodScore(from: levels)
+        }
+    }
+
+    private var past7DayWeekdayLabels: [String] {
+        let today = calendar.startOfDay(for: Date())
+        return (0..<7).compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -6 + offset, to: today) else { return nil }
+            return chartWeekdayFormatter.string(from: date)
         }
     }
 
     private var past7DayDriftHours: [CGFloat] {
         _ = moodLevelsRefreshTick
         let today = calendar.startOfDay(for: Date())
-        let fallbackLevels: [MoodLevelState] = [
-            .init(label: "stress", value: 0.5),
-            .init(label: "fun", value: 0.5),
-            .init(label: "laziness", value: 0.5),
-            .init(label: "inspired", value: 0.5)
-        ]
 
         return (0..<7).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -6 + offset, to: today) else {
-                return CGFloat(3)
+                return CGFloat(0)
             }
             let key = ReflectDateKey(date: date, calendar: calendar)
-            let levels = ReflectMoodLevelStore.loadLevels(for: key, defaults: fallbackLevels)
-            return driftHours(from: levels)
+            guard ReflectMoodLevelStore.hasLevels(for: key) else { return CGFloat(0) }
+            return placeholderDriftHours
         }
     }
 
@@ -480,7 +489,8 @@ struct ReflectView: View {
             VStack(spacing: 14) {
                 ReflectPatternsPreviewChart(
                     scores: past7DayMoodScores,
-                    driftHours: past7DayDriftHours
+                    driftHours: past7DayDriftHours,
+                    weekdayAxis: past7DayWeekdayLabels
                 )
                 .frame(height: 214)
 
@@ -696,10 +706,21 @@ private struct ReflectOutlineActionButton: View {
 }
 
 private struct ReflectPatternsPreviewChart: View {
+    private static let fallbackWeekdayAxis = ["M", "T", "W", "T", "F", "S", "S"]
     let scores: [CGFloat]
     let driftHours: [CGFloat]
-    private let weekdayAxis = ["M", "T", "W", "T", "F", "S", "S"]
+    let weekdayAxis: [String]
     private let chartHeight: CGFloat = 186
+
+    init(
+        scores: [CGFloat],
+        driftHours: [CGFloat],
+        weekdayAxis: [String] = ReflectPatternsPreviewChart.fallbackWeekdayAxis
+    ) {
+        self.scores = scores
+        self.driftHours = driftHours
+        self.weekdayAxis = weekdayAxis.isEmpty ? Self.fallbackWeekdayAxis : weekdayAxis
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -767,6 +788,10 @@ private struct ReflectPatternsPreviewChart: View {
         GeometryReader { proxy in
             let size = proxy.size
             let points = chartPoints(in: size)
+            let stressSegments = contiguousStressSegments(from: points)
+            let xPositions = (0..<chartValues.count).map { index in
+                chartXPosition(for: index, in: size.width, pointCount: chartValues.count)
+            }
             let barWidth = barWidth(for: size.width, pointCount: chartValues.count)
             let driftData = alignedDriftValues(for: chartValues.count)
 
@@ -774,8 +799,8 @@ private struct ReflectPatternsPreviewChart: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(ReflectPalette.warmWhite.opacity(0.82))
 
-                ForEach(points.indices, id: \.self) { idx in
-                    let x = points[idx].x
+                ForEach(xPositions.indices, id: \.self) { idx in
+                    let x = xPositions[idx]
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(
                             LinearGradient(
@@ -796,36 +821,38 @@ private struct ReflectPatternsPreviewChart: View {
                         .position(x: x, y: size.height / 2)
                 }
 
-                ForEach(points.indices, id: \.self) { idx in
+                ForEach(xPositions.indices, id: \.self) { idx in
                     let driftValue = driftData[idx]
-                    let x = points[idx].x
-                    let topY = driftYPosition(for: driftValue, in: size.height)
-                    let height = max(size.height - topY, 6)
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: ReflectPalette.lightGreen.opacity(0.78), location: 0.0),
-                                    .init(color: Color(red: 0.98, green: 0.78, blue: 0.50).opacity(0.93), location: 0.62),
-                                    .init(color: Color(red: 0.95, green: 0.63, blue: 0.38).opacity(0.98), location: 1.0)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
+                    if driftValue > 0 {
+                        let x = xPositions[idx]
+                        let topY = driftYPosition(for: driftValue, in: size.height)
+                        let height = max(size.height - topY, 6)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: ReflectPalette.lightGreen.opacity(0.78), location: 0.0),
+                                        .init(color: Color(red: 0.98, green: 0.78, blue: 0.50).opacity(0.93), location: 0.62),
+                                        .init(color: Color(red: 0.95, green: 0.63, blue: 0.38).opacity(0.98), location: 1.0)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(Color.white.opacity(0.40), lineWidth: 1)
-                        )
-                        .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
-                        .frame(width: barWidth, height: height)
-                        .position(x: x, y: topY + (height / 2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(Color.white.opacity(0.40), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.10), radius: 4, x: 0, y: 2)
+                            .frame(width: barWidth, height: height)
+                            .position(x: x, y: topY + (height / 2))
+                    }
                 }
 
-                ForEach(points.indices, id: \.self) { idx in
+                ForEach(xPositions.indices, id: \.self) { idx in
                     Path { path in
-                        path.move(to: CGPoint(x: points[idx].x, y: 0))
-                        path.addLine(to: CGPoint(x: points[idx].x, y: size.height))
+                        path.move(to: CGPoint(x: xPositions[idx], y: 0))
+                        path.addLine(to: CGPoint(x: xPositions[idx], y: size.height))
                     }
                     .stroke(ReflectPalette.secondaryGreen.opacity(0.16), lineWidth: 1)
                 }
@@ -834,28 +861,31 @@ private struct ReflectPatternsPreviewChart: View {
                 horizontalGridLine(at: yPosition(for: 3, in: size.height), in: size, opacity: 0.18)
                 horizontalGridLine(at: yPosition(for: 1, in: size.height), in: size, opacity: 0.2)
 
-                if points.count > 1 {
-                    areaPath(from: points, in: size)
-                        .fill(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: ReflectPalette.lightGreen.opacity(0.18), location: 0.0),
-                                    .init(color: Color(red: 0.98, green: 0.77, blue: 0.47).opacity(0.22), location: 0.58),
-                                    .init(color: Color(red: 0.96, green: 0.64, blue: 0.42).opacity(0.30), location: 1.0)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                ForEach(stressSegments.indices, id: \.self) { segmentIndex in
+                    let segment = stressSegments[segmentIndex]
+                    if segment.count > 1 {
+                        areaPath(from: segment, in: size)
+                            .fill(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: ReflectPalette.lightGreen.opacity(0.18), location: 0.0),
+                                        .init(color: Color(red: 0.98, green: 0.77, blue: 0.47).opacity(0.22), location: 0.58),
+                                        .init(color: Color(red: 0.96, green: 0.64, blue: 0.42).opacity(0.30), location: 1.0)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
 
-                    smoothedLinePath(from: points)
-                        .stroke(Color(red: 0.96, green: 0.63, blue: 0.36).opacity(0.84), lineWidth: 2)
+                        smoothedLinePath(from: segment)
+                            .stroke(Color(red: 0.96, green: 0.63, blue: 0.36).opacity(0.84), lineWidth: 2)
+                    }
 
-                    ForEach(points.indices, id: \.self) { idx in
+                    ForEach(segment.indices, id: \.self) { idx in
                         Circle()
                             .fill(Color(red: 0.98, green: 0.66, blue: 0.30))
                             .frame(width: 7, height: 7)
-                            .position(points[idx])
+                            .position(segment[idx])
                     }
                 }
             }
@@ -883,22 +913,37 @@ private struct ReflectPatternsPreviewChart: View {
     }
 
     private var chartValues: [CGFloat] {
-        let cleaned = scores.map { min(max($0, 1), 5) }
-        return cleaned.isEmpty ? [3, 3, 3, 3, 3, 3, 3] : cleaned
+        let cleaned = scores.map { value -> CGFloat in
+            guard value > 0 else { return 0 }
+            return min(max(value, 1), 5)
+        }
+        if cleaned.count == weekdayAxis.count {
+            return cleaned
+        }
+        if cleaned.isEmpty {
+            return Array(repeating: 0, count: weekdayAxis.count)
+        }
+        if cleaned.count > weekdayAxis.count {
+            return Array(cleaned.suffix(weekdayAxis.count))
+        }
+        return Array(repeating: 0, count: weekdayAxis.count - cleaned.count) + cleaned
     }
 
     private func alignedDriftValues(for count: Int) -> [CGFloat] {
-        let cleaned = driftHours.map { min(max($0, 0), 6) }
+        let cleaned = driftHours.map { value -> CGFloat in
+            guard value > 0 else { return 0 }
+            return min(max(value, 0), 6)
+        }
         if cleaned.count == count {
             return cleaned
         }
         if cleaned.isEmpty {
-            return Array(repeating: 3.0, count: count)
+            return Array(repeating: 0, count: count)
         }
         if cleaned.count > count {
             return Array(cleaned.suffix(count))
         }
-        return Array(repeating: cleaned.first ?? 3.0, count: count - cleaned.count) + cleaned
+        return Array(repeating: 0, count: count - cleaned.count) + cleaned
     }
 
     private var xAxisLabels: [String] {
@@ -912,14 +957,35 @@ private struct ReflectPatternsPreviewChart: View {
         return (1...count).map { "\($0)" }
     }
 
-    private func chartPoints(in size: CGSize) -> [CGPoint] {
+    private func chartPoints(in size: CGSize) -> [CGPoint?] {
         guard chartValues.count > 1 else { return [] }
         return chartValues.enumerated().map { index, value in
-            CGPoint(
+            guard value > 0 else { return nil }
+            return CGPoint(
                 x: chartXPosition(for: index, in: size.width, pointCount: chartValues.count),
                 y: yPosition(for: value, in: size.height)
             )
         }
+    }
+
+    private func contiguousStressSegments(from points: [CGPoint?]) -> [[CGPoint]] {
+        var segments: [[CGPoint]] = []
+        var current: [CGPoint] = []
+
+        for point in points {
+            if let point {
+                current.append(point)
+            } else if !current.isEmpty {
+                segments.append(current)
+                current = []
+            }
+        }
+
+        if !current.isEmpty {
+            segments.append(current)
+        }
+
+        return segments
     }
 
     private func chartXPosition(for index: Int, in width: CGFloat, pointCount: Int) -> CGFloat {
@@ -1890,9 +1956,16 @@ struct PatternsTrendsView: View {
     private let sectionTitleSize: CGFloat = 24
     private let bodyFontSize: CGFloat = 14
     private let calendar = Calendar.current
+    private let placeholderDriftHours: CGFloat = 3
     private let weekdayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE"
+        return formatter
+    }()
+    private let chartWeekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEEEE"
         return formatter
     }()
     @Environment(\.dismiss) private var dismiss
@@ -1982,7 +2055,8 @@ struct PatternsTrendsView: View {
 
                     ReflectPatternsPreviewChart(
                         scores: trendGraphScores,
-                        driftHours: past7DayDriftHours
+                        driftHours: past7DayDriftHours,
+                        weekdayAxis: past7DayWeekdayLabels
                     )
                     .frame(height: 214)
                 }
@@ -2085,7 +2159,7 @@ struct PatternsTrendsView: View {
                 fun: CGFloat(levelValue(for: "fun", in: levels)),
                 inspired: CGFloat(levelValue(for: "inspired", in: levels)),
                 tenseScore: moodScore(for: date),
-                driftHours: driftHours(from: levels)
+                driftHours: placeholderDriftHours
             )
         }
     }
@@ -2210,6 +2284,10 @@ struct PatternsTrendsView: View {
         }
     }
 
+    private var past7DayWeekdayLabels: [String] {
+        past7DayDates.map { chartWeekdayFormatter.string(from: $0) }
+    }
+
     private var past7DayDriftHours: [CGFloat] {
         _ = moodLevelsRefreshTick
         return past7DayDates.map(driftHours(for:))
@@ -2219,7 +2297,7 @@ struct PatternsTrendsView: View {
         let today = calendar.startOfDay(for: Date())
         return (0..<dayCount).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -(dayCount - 1) + offset, to: today) else {
-                return CGFloat(3)
+                return CGFloat(0)
             }
             return moodScore(for: date)
         }
@@ -2233,7 +2311,7 @@ struct PatternsTrendsView: View {
             .init(label: "fun", value: 0.5),
             .init(label: "inspired", value: 0.5)
         ]
-        guard ReflectMoodLevelStore.hasLevels(for: key) else { return 3 }
+        guard ReflectMoodLevelStore.hasLevels(for: key) else { return 0 }
         let levels = ReflectMoodLevelStore.loadLevels(for: key, defaults: defaults)
 
         let stress = levelValue(for: "stress", in: levels)
@@ -2252,14 +2330,8 @@ struct PatternsTrendsView: View {
 
     private func driftHours(for date: Date) -> CGFloat {
         let key = ReflectDateKey(date: date, calendar: calendar)
-        let defaults: [MoodLevelState] = [
-            .init(label: "stress", value: 0.5),
-            .init(label: "laziness", value: 0.5),
-            .init(label: "fun", value: 0.5),
-            .init(label: "inspired", value: 0.5)
-        ]
-        let levels = ReflectMoodLevelStore.loadLevels(for: key, defaults: defaults)
-        return driftHours(from: levels)
+        guard ReflectMoodLevelStore.hasLevels(for: key) else { return 0 }
+        return placeholderDriftHours
     }
 
     private func driftHours(from levels: [MoodLevelState]) -> CGFloat {
@@ -2286,17 +2358,32 @@ struct PatternsTrendsView: View {
     private var suggestionLines: [String] {
         let mood = trendGraphScores
         let drift = past7DayDriftHours
-        guard mood.count == 7, drift.count == 7 else {
+        let dates = past7DayDates
+        guard mood.count == 7, drift.count == 7, dates.count == 7 else {
             return ["Log mood levels daily to unlock personalized suggestions for tense/calm and drift-hour patterns."]
         }
 
-        let moodAvg = average(mood)
-        let driftAvg = average(drift)
-        let moodDelta = mood.last! - mood.first!
-        let driftDelta = drift.last! - drift.first!
+        let loggedSamples: [(date: Date, mood: CGFloat, drift: CGFloat)] = zip(dates, zip(mood, drift)).compactMap { date, values in
+            let moodValue = values.0
+            let driftValue = values.1
+            guard moodValue > 0, driftValue > 0 else { return nil }
+            return (date: date, mood: moodValue, drift: driftValue)
+        }
 
-        let peakDriftIndex = drift.enumerated().max(by: { $0.element < $1.element })?.offset ?? 6
-        let peakDay = weekdayFormatter.string(from: past7DayDates[peakDriftIndex])
+        guard loggedSamples.count >= 3 else {
+            return ["Log mood levels on at least 3 days to unlock personalized suggestions for tense/calm and drift-hour patterns."]
+        }
+
+        let moodValues = loggedSamples.map(\.mood)
+        let driftValues = loggedSamples.map(\.drift)
+
+        let moodAvg = average(moodValues)
+        let driftAvg = average(driftValues)
+        let moodDelta = moodValues.last! - moodValues.first!
+        let driftDelta = driftValues.last! - driftValues.first!
+
+        let peakSample = loggedSamples.max(by: { $0.drift < $1.drift }) ?? loggedSamples.last!
+        let peakDay = weekdayFormatter.string(from: peakSample.date)
         let roundedTarget = Int(max(1, min(4, (driftAvg - 0.5).rounded())))
 
         var lines: [String] = []
